@@ -125,6 +125,7 @@ void Protocol::didOpen_(nlohmann::json& req)
     Doc doc(uri, version, source);
     if (doc.parse({workspace_.get_root()})) {
         workspace_.update_doc(std::move(doc));
+        publish_clear_diagnostics(uri);
     } else {
         publish_diagnostics(doc.info_log());
         fprintf(stderr, "open file %s failed.\n", uri.c_str());
@@ -169,6 +170,7 @@ void Protocol::didChange_(nlohmann::json& req)
     Doc doc(uri, version, source);
     if (doc.parse({workspace_.get_root()})) {
         workspace_.update_doc(std::move(doc));
+        publish_clear_diagnostics(uri);
     } else {
         publish_diagnostics(doc.info_log());
         fprintf(stderr, "update doc %s failed.\n", uri.c_str());
@@ -215,6 +217,17 @@ void Protocol::publish_diagnostics(std::string const& error)
         nlohmann::json body = {{"uri", uri}, {"diagnostics", diagnostic}};
         publish_("textDocument/publishDiagnostics", &body);
     }
+}
+
+void Protocol::publish_clear_diagnostics(const std::string& uri)
+{
+    nlohmann::json body = nlohmann::json::parse(R"(
+	{
+		"diagnostics": []
+	}
+	)");
+    body["uri"] = uri;
+    publish_("textDocument/publishDiagnostics", &body);
 }
 
 void Protocol::send_to_client_(nlohmann::json& content)

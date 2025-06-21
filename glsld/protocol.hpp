@@ -137,6 +137,7 @@ class Protocol {
 	void send_to_client_(nlohmann::json& content);
     void publish_(std::string const& method, nlohmann::json* content);
 	void publish_diagnostics(const std::string& error);
+	void publish_clear_diagnostics(const std::string& uri);
 
 public:
     int handle(nlohmann::json& req);
