@@ -1,6 +1,9 @@
 #include "protocol.hpp"
 #include <cstdio>
 #include <iostream>
+#include <regex>
+#include <sstream>
+#include <vector>
 
 int Protocol::handle(nlohmann::json& req)
 {
@@ -45,17 +48,7 @@ void Protocol::make_response_(nlohmann::json& req, nlohmann::json* result)
         body["id"] = req["id"];
     }
 
-    std::string body_str = body.dump();
-
-    std::string header;
-    header.append("Content-Length: ");
-    header.append(std::to_string(body_str.size()) + "\r\n");
-    header.append("Content-Type: application/vscode-jsonrpc;charset=utf-8\r\n");
-    header.append("\r\n");
-    header.append(body_str);
-    std::cerr << "resp to client: \n" << header << std::endl;
-    std::cout << header;
-    std::flush(std::cout);
+    send_to_client_(body);
 }
 
 void Protocol::initialize_(nlohmann::json& req)
@@ -133,6 +126,7 @@ void Protocol::didOpen_(nlohmann::json& req)
     if (doc.parse({workspace_.get_root()})) {
         workspace_.update_doc(std::move(doc));
     } else {
+        publish_diagnostics(doc.info_log());
         fprintf(stderr, "open file %s failed.\n", uri.c_str());
     }
 }
@@ -176,7 +170,64 @@ void Protocol::didChange_(nlohmann::json& req)
     if (doc.parse({workspace_.get_root()})) {
         workspace_.update_doc(std::move(doc));
     } else {
+        publish_diagnostics(doc.info_log());
         fprintf(stderr, "update doc %s failed.\n", uri.c_str());
     }
 }
 
+void Protocol::publish_(std::string const& method, nlohmann::json* params)
+{
+    nlohmann::json body;
+    if (!params) {
+        body = nlohmann::json::parse(R"(
+			{
+				"params": {}
+			}
+		)");
+        body["method"] = method;
+    } else {
+        body = {{"method", method}, {"params", *params}};
+    }
+
+    send_to_client_(body);
+}
+
+void Protocol::publish_diagnostics(std::string const& error)
+{
+    std::stringstream ss(error);
+    std::string line;
+    std::map<std::string, nlohmann::json> diagnostics;
+
+    while (std::getline(ss, line)) {
+        std::smatch result;
+        std::regex pattern("ERROR: (file:///.*):([0-9]+): (.*)");
+        if (std::regex_match(line, result, pattern)) {
+            std::string uri = result[1].str();
+            int row = std::atoi(result[2].str().c_str()) - 1;
+            std::string message = result[3].str();
+            nlohmann::json start = {{"line", row}, {"character", 1}};
+            nlohmann::json diagnostic = {{"range", {{"start", start}, {"end", start}}}, {"message", message}};
+            diagnostics[uri].push_back(diagnostic);
+        }
+    }
+
+    for (auto& [uri, diagnostic] : diagnostics) {
+        nlohmann::json body = {{"uri", uri}, {"diagnostics", diagnostic}};
+        publish_("textDocument/publishDiagnostics", &body);
+    }
+}
+
+void Protocol::send_to_client_(nlohmann::json& content)
+{
+    std::string body_str = content.dump();
+
+    std::string header;
+    header.append("Content-Length: ");
+    header.append(std::to_string(body_str.size()) + "\r\n");
+    header.append("Content-Type: application/vscode-jsonrpc;charset=utf-8\r\n");
+    header.append("\r\n");
+    header.append(body_str);
+    std::cerr << "resp to client: \n" << header << std::endl;
+    std::cout << header;
+    std::flush(std::cout);
+}

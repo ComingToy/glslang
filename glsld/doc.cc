@@ -316,7 +316,6 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     success = shader.parse(&kDefaultTBuiltInResource, default_version_, default_profile_, force_version_profile_, false,
                            rules, includer);
     if (!success) {
-        std::cerr << shader.getInfoDebugLog() << std::endl;
         return false;
     }
 

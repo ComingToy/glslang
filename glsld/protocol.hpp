@@ -130,13 +130,16 @@ class Protocol {
 
     void make_response_(nlohmann::json& req, nlohmann::json* result);
     void initialize_(nlohmann::json& body);
-	void didOpen_(nlohmann::json& req);
-	void definition_(nlohmann::json& req);
-	void didChange_(nlohmann::json& req);
+    void didOpen_(nlohmann::json& req);
+    void definition_(nlohmann::json& req);
+    void didChange_(nlohmann::json& req);
+
+	void send_to_client_(nlohmann::json& content);
+    void publish_(std::string const& method, nlohmann::json* content);
+	void publish_diagnostics(const std::string& error);
 
 public:
     int handle(nlohmann::json& req);
 };
 #endif
-
 

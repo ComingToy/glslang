@@ -43,6 +43,7 @@ public:
     void set_text(std::string const& text) { resource_->text = text; }
     void set_uri(std::string const& uri) { resource_->uri = uri; }
     std::vector<glslang::TIntermSymbol*>& symbols() { return resource_->symbols; }
+    const char* info_log() { return resource_->shader->getInfoLog(); }
 
     struct LookupResult {
         enum class Kind { SYMBOL, FIELD, ERROR } kind;
