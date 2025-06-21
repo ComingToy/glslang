@@ -131,9 +131,12 @@ class Protocol {
     void make_response_(nlohmann::json& req, nlohmann::json* result);
     void initialize_(nlohmann::json& body);
 	void didOpen_(nlohmann::json& req);
-	void goto_definition_(nlohmann::json& req);
+	void definition_(nlohmann::json& req);
+	void didChange_(nlohmann::json& req);
 
 public:
     int handle(nlohmann::json& req);
 };
 #endif
+
+

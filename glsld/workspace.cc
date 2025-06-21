@@ -6,7 +6,13 @@ Workspace::Workspace() : root_("/") {}
 
 void Workspace::set_root(std::string const& root) { root_ = root; }
 std::string const& Workspace::get_root() const { return root_; }
-void Workspace::add_doc(Doc&& doc) { docs_[doc.uri()] = std::move(doc); }
+void Workspace::update_doc(Doc&& doc)
+{
+    if (docs_.count(doc.uri()) > 0 && docs_[doc.uri()].version() >= doc.version()) {
+        return;
+    }
+    docs_[doc.uri()] = std::move(doc);
+}
 
 std::vector<Doc::LookupResult> Workspace::lookup_nodes_at(std::string const& uri, const int line, const int col)
 {

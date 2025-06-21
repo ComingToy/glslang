@@ -14,7 +14,7 @@ public:
     Workspace& operator=(const Workspace&) = delete;
     Workspace& operator=(Workspace&&) = delete;
 
-    void add_doc(Doc&& doc);
+    void update_doc(Doc&& doc);
     std::string const& get_root() const;
     void set_root(std::string const& root);
 	glslang::TSourceLoc locate_symbol_def(std::string const& uri, const int line, const int col);

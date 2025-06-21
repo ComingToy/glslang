@@ -1,4 +1,5 @@
 #include "protocol.hpp"
+#include <cstdio>
 #include <iostream>
 
 int Protocol::handle(nlohmann::json& req)
@@ -17,7 +18,9 @@ int Protocol::handle(nlohmann::json& req)
     } else if (method == "textDocument/didOpen") {
         didOpen_(req);
     } else if (method == "textDocument/definition") {
-        goto_definition_(req);
+        definition_(req);
+    } else if (method == "textDocument/didChange") {
+        didChange_(req);
     }
 
     return 0;
@@ -128,13 +131,13 @@ void Protocol::didOpen_(nlohmann::json& req)
     std::string source = textDoc["text"];
     Doc doc(uri, version, source);
     if (doc.parse({workspace_.get_root()})) {
-        workspace_.add_doc(std::move(doc));
+        workspace_.update_doc(std::move(doc));
     } else {
         fprintf(stderr, "open file %s failed.\n", uri.c_str());
     }
 }
 
-void Protocol::goto_definition_(nlohmann::json& req)
+void Protocol::definition_(nlohmann::json& req)
 {
     if (!init_) {
         fprintf(stderr, "server is uninitialized\n");
@@ -160,3 +163,20 @@ void Protocol::goto_definition_(nlohmann::json& req)
         make_response_(req, nullptr);
     }
 }
+
+void Protocol::didChange_(nlohmann::json& req)
+{
+    auto& params = req["params"];
+    auto& textDoc = params["textDocument"];
+    std::string uri = textDoc["uri"];
+    int version = textDoc["version"];
+    std::string source = params["contentChanges"][0]["text"];
+
+    Doc doc(uri, version, source);
+    if (doc.parse({workspace_.get_root()})) {
+        workspace_.update_doc(std::move(doc));
+    } else {
+        fprintf(stderr, "update doc %s failed.\n", uri.c_str());
+    }
+}
+
