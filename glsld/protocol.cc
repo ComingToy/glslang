@@ -11,19 +11,27 @@ int Protocol::handle(nlohmann::json& req)
     std::cerr << "start handle protocol req: \n" << req.dump(4) << std::endl;
 
     std::string method = req["method"];
+    if (method != "initialize" && !init_) {
+        std::cerr << "received request but server is uninitialized." << std::endl;
+        return 0;
+    }
+
     if (method == "initialize") {
-        // std::cerr << "start handle initialize req" << std::endl;
         initialize_(req);
     } else if (method == "initialized") {
         return 0;
     } else if (method == "workspace/didChangeConfiguration") {
         return 0;
     } else if (method == "textDocument/didOpen") {
-        didOpen_(req);
+        did_open_(req);
     } else if (method == "textDocument/definition") {
         definition_(req);
     } else if (method == "textDocument/didChange") {
-        didChange_(req);
+        did_change_(req);
+    } else if (method == "textDocument/completion") {
+        // completion_(req);
+    } else if (method == "textDocument/didSave") {
+        did_save_(req);
     }
 
     return 0;
@@ -58,7 +66,8 @@ void Protocol::initialize_(nlohmann::json& req)
 		"capabilities": {
 			"textDocumentSync": {
 				"openClose": true,
-				"change": 1
+				"change": 1,
+				"save": true
 			},
 			"completionProvider": {
 				"triggerCharacters": [],
@@ -110,7 +119,7 @@ void Protocol::initialize_(nlohmann::json& req)
     make_response_(req, &result);
 }
 
-void Protocol::didOpen_(nlohmann::json& req)
+void Protocol::did_open_(nlohmann::json& req)
 {
     if (!init_) {
         fprintf(stderr, "server is uninitialized\n");
@@ -124,12 +133,59 @@ void Protocol::didOpen_(nlohmann::json& req)
     std::string source = textDoc["text"];
     Doc doc(uri, version, source);
     if (doc.parse({workspace_.get_root()})) {
-        workspace_.update_doc(std::move(doc));
+        workspace_.add_doc(std::move(doc));
         publish_clear_diagnostics(uri);
     } else {
         publish_diagnostics(doc.info_log());
         fprintf(stderr, "open file %s failed.\n", uri.c_str());
     }
+}
+
+void Protocol::did_save_(nlohmann::json& req)
+{
+    auto& params = req["params"];
+    std::string uri = params["textDocument"]["uri"];
+    int version = params["textDocument"]["version"];
+
+    auto [ret, doc] = workspace_.save_doc(uri, version);
+    if (doc) {
+        if (ret)
+            publish_clear_diagnostics(uri);
+        else
+            publish_diagnostics(doc->info_log());
+    }
+}
+
+void Protocol::completion_(nlohmann::json& req)
+{
+    auto& params = req["params"];
+    int triggerKind = params["content"]["triggerKind"];
+    int line = params["position"]["line"];
+    int col = params["position"]["character"];
+    std::string uri = params["textDocument"]["uri"];
+
+    auto symbols = workspace_.lookup_symbols_by_prefix(uri, line, col);
+
+    nlohmann::json completion_items;
+    for (auto sym : symbols) {
+        std::string label = sym->getName().c_str();
+        int kind = 6; //variable
+        std::string detail = "<detail>";
+        std::string insertText = "<insertText>";
+        std::string documentation = "<documentation>";
+
+        nlohmann::json item = {
+            {"label", label},
+            {"kind", kind},
+            {"detail", detail},
+            {"insertText", insertText},
+            {"documentation", documentation},
+            {"labelDetails", {"detail", "<labelDetails.detail>"}, {"description", "<labelDetails.description>"}}};
+
+        completion_items.push_back(item);
+    }
+
+    make_response_(req, &completion_items);
 }
 
 void Protocol::definition_(nlohmann::json& req)
@@ -159,22 +215,14 @@ void Protocol::definition_(nlohmann::json& req)
     }
 }
 
-void Protocol::didChange_(nlohmann::json& req)
+void Protocol::did_change_(nlohmann::json& req)
 {
     auto& params = req["params"];
     auto& textDoc = params["textDocument"];
     std::string uri = textDoc["uri"];
     int version = textDoc["version"];
     std::string source = params["contentChanges"][0]["text"];
-
-    Doc doc(uri, version, source);
-    if (doc.parse({workspace_.get_root()})) {
-        workspace_.update_doc(std::move(doc));
-        publish_clear_diagnostics(uri);
-    } else {
-        publish_diagnostics(doc.info_log());
-        fprintf(stderr, "update doc %s failed.\n", uri.c_str());
-    }
+    workspace_.update_doc(uri, version, source);
 }
 
 void Protocol::publish_(std::string const& method, nlohmann::json* params)

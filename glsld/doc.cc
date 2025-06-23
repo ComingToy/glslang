@@ -6,6 +6,8 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <sstream>
+#include <utility>
 #include <vector>
 
 static const TBuiltInResource kDefaultTBuiltInResource = {
@@ -149,10 +151,22 @@ Doc::Doc(std::string const& uri, const int version, std::string const& text)
     resource_->ref = 1;
     resource_->uri = uri;
     resource_->version = version;
-    resource_->text = text;
 
+    set_text(text);
     infer_language_();
     resource_->shader = std::make_unique<glslang::TShader>(resource_->language);
+}
+
+void Doc::set_text(std::string const& text)
+{
+    std::stringstream ss(text);
+    std::string line;
+
+    while (std::getline(ss, line)) {
+        resource_->lines_.emplace_back(std::move(line));
+    }
+
+    resource_->text_ = text;
 }
 
 Doc::Doc(const Doc& rhs)
@@ -266,7 +280,7 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     const std::string pound_extension = "#extension GL_GOOGLE_include_directive : enable\n";
     preambles += pound_extension;
 
-    auto& shader_strings = resource_->text;
+    auto& shader_strings = resource_->text_;
     const char* shader_source = shader_strings.data();
     const int shader_lengths = (int)shader_strings.size();
     const char* string_names = resource_->uri.data();
@@ -415,4 +429,22 @@ glslang::TSourceLoc Doc::locate_symbol_def(glslang::TIntermSymbol* target)
     }
 
     return {.name = nullptr, .line = 0, .column = 0};
+}
+
+std::vector<glslang::TIntermSymbol*> Doc::lookup_symbols_by_prefix(std::string const& prefix)
+{
+    std::vector<glslang::TIntermSymbol*> symbols;
+    for (auto& [id, sym] : resource_->defs) {
+        auto name = sym->getName();
+        if (name.size() < prefix.size()) {
+            continue;
+        }
+
+        std::string sub = name.substr(0, prefix.size()).c_str();
+        if (sub == prefix) {
+            symbols.push_back(sym);
+        }
+    }
+
+    return symbols;
 }

@@ -1,18 +1,36 @@
 #include "workspace.hpp"
 #include "glsld/doc.hpp"
+#include <tuple>
 #include <vector>
 
 Workspace::Workspace() : root_("/") {}
 
 void Workspace::set_root(std::string const& root) { root_ = root; }
 std::string const& Workspace::get_root() const { return root_; }
-void Workspace::update_doc(Doc&& doc)
+void Workspace::update_doc(std::string const& uri, const int version, std::string const& text)
 {
-    if (docs_.count(doc.uri()) > 0 && docs_[doc.uri()].version() >= doc.version()) {
+    if (docs_.count(uri) > 0 && docs_[uri].version() >= version) {
         return;
     }
-    docs_[doc.uri()] = std::move(doc);
+    docs_[uri].set_text(text);
+	docs_[uri].set_version(version);
 }
+
+std::tuple<bool, Doc*> Workspace::save_doc(std::string const& uri, const int version)
+{
+    if (docs_.count(uri) > 0) {
+        auto& doc = docs_[uri];
+        if (doc.version() == version) {
+            bool ret = doc.parse({get_root()});
+            return std::make_tuple(ret, &doc);
+        }
+        return std::make_tuple(true, &doc);
+    }
+
+    return std::make_tuple(true, nullptr);
+}
+
+void Workspace::add_doc(Doc&& doc) { docs_[doc.uri()] = std::move(doc); }
 
 std::vector<Doc::LookupResult> Workspace::lookup_nodes_at(std::string const& uri, const int line, const int col)
 {
@@ -40,3 +58,23 @@ glslang::TSourceLoc Workspace::locate_symbol_def(std::string const& uri, const i
     return {.name = nullptr, .column = 0, .line = 0};
 }
 
+std::vector<glslang::TIntermSymbol*> Workspace::lookup_symbols_by_prefix(std::string const& uri, const int line,
+                                                                         const int col)
+{
+    const auto& lines = docs_[uri].lines();
+    std::string const& text = lines[line];
+    if (text.size() < col) {
+        return {};
+    }
+
+    auto pos = text.rbegin() + (text.size() - 1 - col);
+    std::vector<char> buf;
+    for (; pos != text.rend(); ++pos) {
+        if (*pos == ' ')
+            break;
+        buf.push_back(*pos);
+    }
+
+    std::string prefix(buf.rbegin(), buf.rend());
+    return docs_[uri].lookup_symbols_by_prefix(prefix);
+}

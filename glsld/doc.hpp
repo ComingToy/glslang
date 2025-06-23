@@ -11,7 +11,8 @@ class Doc {
     struct __Resource {
         std::string uri;
         int version;
-        std::string text;
+        std::string text_;
+        std::vector<std::string> lines_;
         EShLanguage language;
         std::unique_ptr<glslang::TShader> shader;
         std::map<int, std::vector<TIntermNode*>> nodes_by_line;
@@ -36,13 +37,14 @@ public:
     bool parse(std::vector<std::string> const& include_dirs);
 
     int version() const { return resource_->version; }
-    std::string const& text() const { return resource_->text; }
+    std::vector<std::string> const& lines() const { return resource_->lines_; }
     std::string const& uri() const { return resource_->uri; }
     EShLanguage language() const { return resource_->language; }
     void set_version(const int version) { resource_->version = version; }
-    void set_text(std::string const& text) { resource_->text = text; }
+    void set_text(std::string const& text);
     void set_uri(std::string const& uri) { resource_->uri = uri; }
     std::vector<glslang::TIntermSymbol*>& symbols() { return resource_->symbols; }
+    std::vector<glslang::TIntermSymbol*> lookup_symbols_by_prefix(std::string const& prefix);
     const char* info_log() { return resource_->shader->getInfoLog(); }
 
     struct LookupResult {
