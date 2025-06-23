@@ -154,7 +154,7 @@ Doc::Doc(std::string const& uri, const int version, std::string const& text)
 
     set_text(text);
     infer_language_();
-    resource_->shader = std::make_unique<glslang::TShader>(resource_->language);
+    resource_->shader = nullptr;
 }
 
 void Doc::set_text(std::string const& text)
@@ -273,6 +273,7 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     if (!resource_)
         return false;
 
+	resource_->shader = std::make_unique<glslang::TShader>(language());
     auto& shader = *resource_->shader;
     std::string preambles;
     // TODO: add macro define
