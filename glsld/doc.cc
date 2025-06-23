@@ -162,7 +162,7 @@ void Doc::set_text(std::string const& text)
     std::stringstream ss(text);
     std::string line;
 
-	resource_->lines_.clear();
+    resource_->lines_.clear();
     while (std::getline(ss, line)) {
         resource_->lines_.emplace_back(std::move(line));
     }
@@ -274,10 +274,10 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     if (!resource_)
         return false;
 
-	resource_->shader = std::make_unique<glslang::TShader>(language());
-	resource_->nodes_by_line.clear();
-	resource_->defs.clear();
-	resource_->symbols.clear();
+    resource_->shader = std::make_unique<glslang::TShader>(language());
+    resource_->nodes_by_line.clear();
+    resource_->defs.clear();
+    resource_->symbols.clear();
 
     auto& shader = *resource_->shader;
     std::string preambles;
@@ -453,4 +453,15 @@ std::vector<glslang::TIntermSymbol*> Doc::lookup_symbols_by_prefix(std::string c
     }
 
     return symbols;
+}
+
+glslang::TIntermSymbol* Doc::lookup_symbol_by_name(std::string const& name)
+{
+    for (auto& [id, sym] : resource_->defs) {
+        if (name == sym->getName().c_str()) {
+            return sym;
+        }
+    }
+
+    return nullptr;
 }

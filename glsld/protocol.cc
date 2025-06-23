@@ -70,7 +70,7 @@ void Protocol::initialize_(nlohmann::json& req)
 				"save": true
 			},
 			"completionProvider": {
-				"triggerCharacters": [],
+				"triggerCharacters": ["."],
 				"resolveProvider": true,
 				"completionItem": {
 					"labelDetailsSupport": true
@@ -156,19 +156,115 @@ void Protocol::did_save_(nlohmann::json& req)
     }
 }
 
-void Protocol::completion_(nlohmann::json& req)
+static std::vector<std::string> split(const std::string& s, char delim)
 {
-    auto& params = req["params"];
-    // int triggerKind = params["context"]["triggerKind"];
-    int line = params["position"]["line"];
-    int col = params["position"]["character"];
-    std::string uri = params["textDocument"]["uri"];
+    std::stringstream ss(s);
+    std::string item;
+    std::vector<std::string> elems;
+    while (std::getline(ss, item, delim)) {
+        elems.push_back(item);
+    }
+    return elems;
+}
 
-    auto symbols = workspace_.lookup_symbols_by_prefix(uri, line, col);
+nlohmann::json Protocol::complete_field_(std::string const& uri, std::string const& input)
+{
+    std::cerr << "completion field with input: " << input << std::endl;
+    nlohmann::json completion_items;
+
+    auto terms = split(input, '.');
+	if (input.back() == '.')
+	{
+		terms.push_back("");
+	}
+
+    auto* sym = workspace_.lookup_symbol_by_name(uri, terms[0]);
+    if (!sym) {
+        return completion_items;
+    }
+
+    std::cerr << "struct variable name: " << terms[0] << std::endl;
+    if (terms.empty())
+        return completion_items;
+
+    std::vector<std::string> selectors;
+    for (auto i = 1; i < (int)terms.size() - 1; ++i) {
+        selectors.push_back(terms[i]);
+        std::cerr << "selector " << terms[i] << std::endl;
+    }
+
+    std::string prefix = "";
+    if (terms.size() >= 2) {
+        prefix = terms.back();
+    }
+
+	std::cerr << "prefix: " << prefix << std::endl;
+
+    auto match_prefix = [&prefix](std::string const& field) {
+        if (prefix.empty())
+            return true;
+
+        return prefix == field.substr(0, prefix.size());
+    };
+
+    auto isstruct =
+        sym->getType().isReference() ? sym->getType().getReferentType()->isStruct() : sym->getType().isStruct();
+    if (!isstruct)
+        return completion_items;
+
+    const auto* members =
+        sym->getType().isReference() ? sym->getType().getReferentType()->getStruct() : sym->getType().getStruct();
+
+    if (!selectors.empty()) {
+        for (auto& selector : selectors) {
+            for (int i = 0; i < members->size(); ++i) {
+                auto* member = (*members)[i].type;
+                if (selector != member->getFieldName().c_str()) {
+                    continue;
+                }
+
+                if (!member->isStruct()) {
+                    return completion_items;
+                }
+
+                members = member->isReference() ? member->getReferentType()->getStruct() : member->getStruct();
+                break;
+            }
+        }
+    }
+
+    for (int i = 0; i < members->size(); ++i) {
+        const auto field = (*members)[i].type;
+        auto label = field->getFieldName();
+        if (!match_prefix(label.c_str())) {
+            continue;
+        }
+        auto ftypename = field->isStruct() ? field->getTypeName() : field->getBasicTypeString();
+
+        int kind = 5; // field
+        nlohmann::json item;
+        item["label"] = label;
+        item["kind"] = kind;
+
+        std::string detail = "<detail>";
+        std::string insertText = "<insertText>";
+        std::string documentation = "<documentation>";
+        item["documentation"] = documentation;
+        item["labelDetails"]["detail"] = " " + ftypename;
+        completion_items.push_back(item);
+    }
+
+    return completion_items;
+}
+
+nlohmann::json Protocol::complete_variable_(std::string const& uri, std::string const& input)
+{
+    auto symbols = workspace_.lookup_symbols_by_prefix(uri, input);
 
     nlohmann::json completion_items;
     for (auto sym : symbols) {
         std::string label = sym->getName().c_str();
+        const auto& type = sym->getType();
         int kind = 6; //variable
         std::string detail = "<detail>";
         std::string insertText = "<insertText>";
@@ -181,10 +277,30 @@ void Protocol::completion_(nlohmann::json& req)
         // item["insertText"] = insertText;
         item["documentation"] = documentation;
 
-        const auto& type = sym->getType();
-        auto typname = type.isStruct() ? "struct " + type.getTypeName() : type.getBasicTypeString();
+        auto typname = type.isStruct() ? type.getTypeName() : type.getBasicTypeString();
         item["labelDetails"]["detail"] = " " + typname;
         completion_items.push_back(item);
+    }
+
+    return completion_items;
+}
+
+void Protocol::completion_(nlohmann::json& req)
+{
+    auto& params = req["params"];
+    // int triggerKind = params["context"]["triggerKind"];
+    int line = params["position"]["line"];
+    int col = params["position"]["character"];
+    std::string uri = params["textDocument"]["uri"];
+
+    auto term = workspace_.get_term(uri, line, col);
+    auto is_field = term.find(".") != std::string::npos;
+
+    nlohmann::json completion_items;
+    if (is_field) {
+        completion_items = complete_field_(uri, term);
+    } else {
+        completion_items = complete_variable_(uri, term);
     }
 
     make_response_(req, &completion_items);

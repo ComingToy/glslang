@@ -21,7 +21,8 @@ public:
     void set_root(std::string const& root);
     glslang::TSourceLoc locate_symbol_def(std::string const& uri, const int line, const int col);
     std::vector<Doc::LookupResult> lookup_nodes_at(std::string const& uri, const int line, const int col);
-    std::vector<glslang::TIntermSymbol*> lookup_symbols_by_prefix(std::string const& uri, const int line,
-                                                                  const int col);
+    glslang::TIntermSymbol* lookup_symbol_by_name(std::string const& uri, std::string const& name);
+    std::vector<glslang::TIntermSymbol*> lookup_symbols_by_prefix(std::string const& uri, std::string const& prefix);
+    std::string get_term(std::string const& uri, const int line, const int col);
 };
 #endif

@@ -61,12 +61,15 @@ glslang::TSourceLoc Workspace::locate_symbol_def(std::string const& uri, const i
     return {.name = nullptr, .column = 0, .line = 0};
 }
 
-std::vector<glslang::TIntermSymbol*> Workspace::lookup_symbols_by_prefix(std::string const& uri, const int line,
-                                                                         const int col)
+std::string Workspace::get_term(std::string const& uri, const int line, const int col)
 {
+    if (docs_.count(uri) <= 0)
+        return "";
+
     const auto& lines = docs_[uri].lines();
     std::string const& text = lines[line];
-    std::cerr << "completion at line " << line << ": " << text << std::endl << "text size: " << text.size() << ", col: " << col;
+    std::cerr << "completion at line " << line << ": " << text << std::endl
+              << "text size: " << text.size() << ", col: " << col;
     if (text.size() < col) {
         return {};
     }
@@ -80,10 +83,24 @@ std::vector<glslang::TIntermSymbol*> Workspace::lookup_symbols_by_prefix(std::st
     }
 
     std::string prefix(buf.rbegin(), buf.rend());
-    std::cerr << "lookup symbols by prefix: " << prefix << std::endl;
+    return prefix;
+}
+
+std::vector<glslang::TIntermSymbol*> Workspace::lookup_symbols_by_prefix(std::string const& uri, std::string const& prefix)
+{
     auto syms = docs_[uri].lookup_symbols_by_prefix(prefix);
-	for(auto* sym: syms){
-		std::cerr << "find symbol: " << sym->getName() << std::endl;
-	}
+    for (auto* sym : syms) {
+        std::cerr << "find symbol: " << sym->getName() << std::endl;
+    }
     return syms;
+}
+
+glslang::TIntermSymbol* Workspace::lookup_symbol_by_name(std::string const& uri, std::string const& name)
+{
+    if (docs_.count(uri) <= 0) {
+        return nullptr;
+    }
+
+    auto& doc = docs_[uri];
+	return doc.lookup_symbol_by_name(name);
 }
