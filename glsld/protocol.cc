@@ -29,7 +29,7 @@ int Protocol::handle(nlohmann::json& req)
     } else if (method == "textDocument/didChange") {
         did_change_(req);
     } else if (method == "textDocument/completion") {
-        // completion_(req);
+        completion_(req);
     } else if (method == "textDocument/didSave") {
         did_save_(req);
     }
@@ -159,7 +159,7 @@ void Protocol::did_save_(nlohmann::json& req)
 void Protocol::completion_(nlohmann::json& req)
 {
     auto& params = req["params"];
-    int triggerKind = params["content"]["triggerKind"];
+    // int triggerKind = params["context"]["triggerKind"];
     int line = params["position"]["line"];
     int col = params["position"]["character"];
     std::string uri = params["textDocument"]["uri"];
@@ -174,14 +174,16 @@ void Protocol::completion_(nlohmann::json& req)
         std::string insertText = "<insertText>";
         std::string documentation = "<documentation>";
 
-        nlohmann::json item = {
-            {"label", label},
-            {"kind", kind},
-            {"detail", detail},
-            {"insertText", insertText},
-            {"documentation", documentation},
-            {"labelDetails", {"detail", "<labelDetails.detail>"}, {"description", "<labelDetails.description>"}}};
+        nlohmann::json item;
+        item["label"] = label;
+        item["kind"] = kind;
+        item["detail"] = detail;
+        // item["insertText"] = insertText;
+        item["documentation"] = documentation;
 
+        const auto& type = sym->getType();
+        auto typname = type.isStruct() ? "struct " + type.getTypeName() : type.getBasicTypeString();
+        item["labelDetails"]["detail"] = " " + typname;
         completion_items.push_back(item);
     }
 

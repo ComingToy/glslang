@@ -162,6 +162,7 @@ void Doc::set_text(std::string const& text)
     std::stringstream ss(text);
     std::string line;
 
+	resource_->lines_.clear();
     while (std::getline(ss, line)) {
         resource_->lines_.emplace_back(std::move(line));
     }
@@ -274,6 +275,10 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
         return false;
 
 	resource_->shader = std::make_unique<glslang::TShader>(language());
+	resource_->nodes_by_line.clear();
+	resource_->defs.clear();
+	resource_->symbols.clear();
+
     auto& shader = *resource_->shader;
     std::string preambles;
     // TODO: add macro define

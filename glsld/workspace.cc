@@ -1,5 +1,6 @@
 #include "workspace.hpp"
 #include "glsld/doc.hpp"
+#include <iostream>
 #include <tuple>
 #include <vector>
 
@@ -9,11 +10,13 @@ void Workspace::set_root(std::string const& root) { root_ = root; }
 std::string const& Workspace::get_root() const { return root_; }
 void Workspace::update_doc(std::string const& uri, const int version, std::string const& text)
 {
-    if (docs_.count(uri) > 0 && docs_[uri].version() >= version) {
+    if (docs_.count(uri) > 0) {
+        if (docs_[uri].version() < version) {
+            docs_[uri].set_text(text);
+            docs_[uri].set_version(version);
+        }
         return;
     }
-    docs_[uri].set_text(text);
-	docs_[uri].set_version(version);
 }
 
 std::tuple<bool, Doc*> Workspace::save_doc(std::string const& uri, const int version)
@@ -63,11 +66,12 @@ std::vector<glslang::TIntermSymbol*> Workspace::lookup_symbols_by_prefix(std::st
 {
     const auto& lines = docs_[uri].lines();
     std::string const& text = lines[line];
+    std::cerr << "completion at line " << line << ": " << text << std::endl << "text size: " << text.size() << ", col: " << col;
     if (text.size() < col) {
         return {};
     }
 
-    auto pos = text.rbegin() + (text.size() - 1 - col);
+    auto pos = text.rbegin() + (text.size() - col);
     std::vector<char> buf;
     for (; pos != text.rend(); ++pos) {
         if (*pos == ' ')
@@ -76,5 +80,10 @@ std::vector<glslang::TIntermSymbol*> Workspace::lookup_symbols_by_prefix(std::st
     }
 
     std::string prefix(buf.rbegin(), buf.rend());
-    return docs_[uri].lookup_symbols_by_prefix(prefix);
+    std::cerr << "lookup symbols by prefix: " << prefix << std::endl;
+    auto syms = docs_[uri].lookup_symbols_by_prefix(prefix);
+	for(auto* sym: syms){
+		std::cerr << "find symbol: " << sym->getName() << std::endl;
+	}
+    return syms;
 }
