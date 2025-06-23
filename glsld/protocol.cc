@@ -71,7 +71,7 @@ void Protocol::initialize_(nlohmann::json& req)
 			},
 			"completionProvider": {
 				"triggerCharacters": ["."],
-				"resolveProvider": true,
+				"resolveProvider": false,
 				"completionItem": {
 					"labelDetailsSupport": true
 				}
@@ -173,10 +173,9 @@ nlohmann::json Protocol::complete_field_(std::string const& uri, std::string con
     nlohmann::json completion_items;
 
     auto terms = split(input, '.');
-	if (input.back() == '.')
-	{
-		terms.push_back("");
-	}
+    if (input.back() == '.') {
+        terms.push_back("");
+    }
 
     auto* sym = workspace_.lookup_symbol_by_name(uri, terms[0]);
     if (!sym) {
@@ -198,7 +197,7 @@ nlohmann::json Protocol::complete_field_(std::string const& uri, std::string con
         prefix = terms.back();
     }
 
-	std::cerr << "prefix: " << prefix << std::endl;
+    std::cerr << "prefix: " << prefix << std::endl;
 
     auto match_prefix = [&prefix](std::string const& field) {
         if (prefix.empty())
@@ -245,12 +244,10 @@ nlohmann::json Protocol::complete_field_(std::string const& uri, std::string con
         nlohmann::json item;
         item["label"] = label;
         item["kind"] = kind;
+        item["detail"] = ftypename;
 
-        std::string detail = "<detail>";
-        std::string insertText = "<insertText>";
-        std::string documentation = "<documentation>";
+        std::string documentation = "";
         item["documentation"] = documentation;
-        item["labelDetails"]["detail"] = " " + ftypename;
         completion_items.push_back(item);
     }
 
@@ -265,20 +262,18 @@ nlohmann::json Protocol::complete_variable_(std::string const& uri, std::string 
     for (auto sym : symbols) {
         std::string label = sym->getName().c_str();
         const auto& type = sym->getType();
+        auto typname = type.isStruct() ? type.getTypeName() : type.getBasicTypeString();
+
         int kind = 6; //variable
-        std::string detail = "<detail>";
-        std::string insertText = "<insertText>";
-        std::string documentation = "<documentation>";
+        std::string detail = typname.c_str();
+        std::string documentation = "";
 
         nlohmann::json item;
         item["label"] = label;
         item["kind"] = kind;
         item["detail"] = detail;
-        // item["insertText"] = insertText;
         item["documentation"] = documentation;
 
-        auto typname = type.isStruct() ? type.getTypeName() : type.getBasicTypeString();
-        item["labelDetails"]["detail"] = " " + typname;
         completion_items.push_back(item);
     }
 
