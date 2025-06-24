@@ -3,7 +3,7 @@ find_package(nlohmann_json REQUIRED)
 add_executable(compile_compute_shader compile_compute_shader.cc) 
 target_link_libraries(compile_compute_shader PUBLIC MachineIndependent)
 
-add_library(lsp STATIC doc.cc workspace.cc protocol.cc)
+add_library(lsp STATIC doc.cc workspace.cc protocol.cc completion.cc)
 target_link_libraries(lsp PUBLIC MachineIndependent nlohmann_json::nlohmann_json)
 target_include_directories(lsp PUBLIC ${nlohmann_json_DIR}/../../../include)
 

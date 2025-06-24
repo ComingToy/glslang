@@ -10,7 +10,7 @@
 #include <utility>
 #include <vector>
 
-static const TBuiltInResource kDefaultTBuiltInResource = {
+const TBuiltInResource Doc::kDefaultTBuiltInResource = {
     /*.maxLights = */ 8,        // From OpenGL 3.0 table 6.46.
     /*.maxClipPlanes = */ 6,    // From OpenGL 3.0 table 6.46.
     /*.maxTextureUnits = */ 2,  // From OpenGL 3.0 table 6.50.

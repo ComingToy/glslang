@@ -86,7 +86,8 @@ std::string Workspace::get_term(std::string const& uri, const int line, const in
     return prefix;
 }
 
-std::vector<glslang::TIntermSymbol*> Workspace::lookup_symbols_by_prefix(std::string const& uri, std::string const& prefix)
+std::vector<glslang::TIntermSymbol*> Workspace::lookup_symbols_by_prefix(std::string const& uri,
+                                                                         std::string const& prefix)
 {
     auto syms = docs_[uri].lookup_symbols_by_prefix(prefix);
     for (auto* sym : syms) {
@@ -102,5 +103,13 @@ glslang::TIntermSymbol* Workspace::lookup_symbol_by_name(std::string const& uri,
     }
 
     auto& doc = docs_[uri];
-	return doc.lookup_symbol_by_name(name);
+    return doc.lookup_symbol_by_name(name);
+}
+
+Doc* Workspace::get_doc(std::string const& uri)
+{
+    if (docs_.count(uri) > 0)
+        return &docs_[uri];
+    else
+        return nullptr;
 }

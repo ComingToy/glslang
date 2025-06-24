@@ -1,4 +1,5 @@
 #include "protocol.hpp"
+#include "completion.hpp"
 #include <cstdio>
 #include <iostream>
 #include <regex>
@@ -67,7 +68,8 @@ void Protocol::initialize_(nlohmann::json& req)
 			"textDocumentSync": {
 				"openClose": true,
 				"change": 1,
-				"save": true
+				"save": true,
+				"willSave": false 
 			},
 			"completionProvider": {
 				"triggerCharacters": ["."],
@@ -238,7 +240,8 @@ nlohmann::json Protocol::complete_field_(std::string const& uri, std::string con
         if (!match_prefix(label.c_str())) {
             continue;
         }
-        auto ftypename = field->isStruct() ? field->getTypeName() : field->getBasicTypeString();
+        auto ftypename = field->isStruct() ? field->getCompleteString(true, false, false)
+                                           : field->getCompleteString(true, false, false);
 
         int kind = 5; // field
         nlohmann::json item;
@@ -262,7 +265,8 @@ nlohmann::json Protocol::complete_variable_(std::string const& uri, std::string 
     for (auto sym : symbols) {
         std::string label = sym->getName().c_str();
         const auto& type = sym->getType();
-        auto typname = type.isStruct() ? type.getTypeName() : type.getBasicTypeString();
+        auto typname =
+            type.isStruct() ? type.getCompleteString(true, false, false) : type.getCompleteString(true, false, false);
 
         int kind = 6; //variable
         std::string detail = typname.c_str();
@@ -294,6 +298,7 @@ void Protocol::completion_(nlohmann::json& req)
     nlohmann::json completion_items;
     if (is_field) {
         completion_items = complete_field_(uri, term);
+		completion(*workspace_.get_doc(uri), term);
     } else {
         completion_items = complete_variable_(uri, term);
     }

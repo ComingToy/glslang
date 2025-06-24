@@ -45,7 +45,8 @@ public:
     void set_uri(std::string const& uri) { resource_->uri = uri; }
     std::vector<glslang::TIntermSymbol*>& symbols() { return resource_->symbols; }
     std::vector<glslang::TIntermSymbol*> lookup_symbols_by_prefix(std::string const& prefix);
-	glslang::TIntermSymbol* lookup_symbol_by_name(std::string const& name);
+    glslang::TIntermSymbol* lookup_symbol_by_name(std::string const& name);
+    glslang::TIntermediate* intermediate() { return resource_->shader->getIntermediate(); }
     const char* info_log() { return resource_->shader->getInfoLog(); }
 
     struct LookupResult {
@@ -58,5 +59,6 @@ public:
 
     std::vector<LookupResult> lookup_nodes_at(const int line, const int col);
     glslang::TSourceLoc locate_symbol_def(glslang::TIntermSymbol* use);
+	static const TBuiltInResource kDefaultTBuiltInResource;
 };
 #endif

@@ -17,6 +17,7 @@ public:
     void update_doc(std::string const& uri, const int version, std::string const& text);
     void add_doc(Doc&& doc);
     std::tuple<bool, Doc*> save_doc(std::string const& uri, const int version);
+	Doc* get_doc(std::string const& uri);
     std::string const& get_root() const;
     void set_root(std::string const& root);
     glslang::TSourceLoc locate_symbol_def(std::string const& uri, const int line, const int col);
