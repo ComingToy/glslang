@@ -111,6 +111,60 @@ glslang::TIntermSymbol* reduce_symbol_(Doc& doc, YYSTYPE const& stype)
     return doc.lookup_symbol_by_name(stype.lex.string->c_str());
 }
 
+bool reduce_field_(Doc& doc, std::stack<InputStackState>& input_stack)
+{
+    auto field = input_stack.top();
+    input_stack.pop();
+    auto dot = input_stack.top();
+    input_stack.pop();
+    auto s = input_stack.top();
+    input_stack.pop();
+
+    auto& members = *s.ttype->getStruct();
+    int i = 0;
+    int kind = 0;
+
+    glslang::TType* fty = nullptr;
+
+    if (field.kind != 0 || field.tok != IDENTIFIER) {
+        return false;
+    }
+
+    if (dot.kind != 0 || dot.tok != DOT) {
+        return false;
+    }
+
+    if (s.kind != 1 || !s.ttype->isStruct()) {
+        return false;
+    }
+
+    for (i = 0; i < members.size(); ++i) {
+        fty = members[i].type;
+        if (fty->isReference()) {
+            fty = fty->getReferentType();
+        }
+
+        if (fty->getFieldName() == field.stype->lex.string->c_str()) {
+            break;
+        }
+    }
+
+    if (!fty) {
+        return false;
+    }
+
+    if (fty->isArray()) {
+        kind = 2;
+    } else if (fty->isStruct()) {
+        kind = 1;
+    } else if (fty->isScalar()) {
+        kind = 3;
+    }
+
+    input_stack.push({kind, fty, nullptr, 0});
+    return true;
+}
+
 bool reduce_subscript_(Doc& doc, std::stack<InputStackState>& input_stack)
 {
     while (!input_stack.empty() || input_stack.top().tok != LEFT_BRACKET) {
@@ -130,7 +184,6 @@ bool reduce_subscript_(Doc& doc, std::stack<InputStackState>& input_stack)
     auto* ttype = top.ttype;
     auto array = ttype->getArraySizes();
     auto node = array->getDimNode(0);
-    top.ttype = &node->getType();
     if (node->isArray()) {
         top.kind = 2;
     } else if (node->isStruct()) {
@@ -138,11 +191,18 @@ bool reduce_subscript_(Doc& doc, std::stack<InputStackState>& input_stack)
     } else {
         top.kind = 3;
     }
+
+    top.ttype = &node->getType();
+    return true;
 }
 
 bool reduce_arr_(Doc& doc, std::stack<InputStackState>& input_stack)
 {
     auto& top = input_stack.top();
+    if (top.kind == 2) {
+        return true;
+    }
+
     if (top.kind != 0 || top.tok != IDENTIFIER) {
         return false;
     }
@@ -255,6 +315,8 @@ bool complete_by_prefix(Doc& doc, const std::stack<InputStackState>& input_stack
     return true;
 }
 
+void do_complete_exp_(Doc& doc, std::stack<InputStackState>& input_stack, std::vector<CompletionResult>& results) {}
+
 std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tuple<YYSTYPE, int>> const& lex_info)
 {
     //very tiny varaible exp parser
@@ -271,26 +333,34 @@ std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tuple<YYSTY
 
 #define START 0
 #define END -1
-#define EXPECT_DOT_BRACKET 1
+#define EXPECT_DOT_LBRACKET 1
 #define EXPECT_IDENTIFIER 2
-#define EXPECT_IDENTIFIER_OR_CONST 3
+#define EXPECT_RBRACKET 3
 
-    int state = EXPECT_IDENTIFIER;
-    glslang::TType* type = nullptr;
+    int state = START;
     //0 tok for start, -1 tok for end
-    for (int i = 0; i < lex_info.size() - 1; ++i) {
+    for (int i = 0; i < lex_info.size(); ++i) {
         auto const& [stype, tok] = lex_info[i];
+        if (tok == -1) {
+            //do complete at end
+            if (input_stack.top().kind == 0) {
+                do_complete_exp_(doc, input_stack, results);
+            }
+
+            return results;
+        }
+
         switch (state) {
         case START:
             if (tok == IDENTIFIER) {
                 input_stack.push({0, nullptr, &stype, tok});
-                state = EXPECT_DOT_BRACKET;
+                state = EXPECT_DOT_LBRACKET;
             } else {
                 // err
                 return results;
             }
             break;
-        case EXPECT_DOT_BRACKET:
+        case EXPECT_DOT_LBRACKET:
             if (tok == DOT) {
                 if (!reduce_struct_(doc, input_stack)) {
                     return results;
@@ -304,10 +374,41 @@ std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tuple<YYSTY
                     return results;
                 }
                 input_stack.push({0, nullptr, &stype, tok});
-            } else if (tok == LEFT_BRACKET) {
+                state = EXPECT_RBRACKET;
+            } else {
+                return results;
             }
+            break;
+        case EXPECT_IDENTIFIER: {
+            auto const& [nstype, ntok] = lex_info[i + 1];
+            if (ntok == -1) {
+                input_stack.push({0, nullptr, &stype, tok});
+            } else if (tok == IDENTIFIER) {
+                if (input_stack.top().kind == 0 && input_stack.top().tok == DOT) {
+                    input_stack.push({0, nullptr, &stype, tok});
+                    if (!reduce_field_(doc, input_stack)) {
+                        return results;
+                    }
+                    state = EXPECT_DOT_LBRACKET;
+                }
+            } else {
+                return results;
+            }
+        } break;
+        case EXPECT_RBRACKET:
+            if (tok == RIGHT_BRACKET) {
+                if (!reduce_subscript_(doc, input_stack)) {
+                    return results;
+                }
+                state = EXPECT_DOT_LBRACKET;
+            }
+            break;
+        default:
+            break;
         }
     }
+
+    return results;
 }
 
 std::vector<CompletionResult> completion(Doc& doc, std::string const& input)
