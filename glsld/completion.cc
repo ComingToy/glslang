@@ -128,6 +128,16 @@ bool reduce_subscript_(Doc& doc, std::stack<InputStackState>& input_stack)
     }
 
     auto* ttype = top.ttype;
+    auto array = ttype->getArraySizes();
+    auto node = array->getDimNode(0);
+    top.ttype = &node->getType();
+    if (node->isArray()) {
+        top.kind = 2;
+    } else if (node->isStruct()) {
+        top.kind = 1;
+    } else {
+        top.kind = 3;
+    }
 }
 
 bool reduce_arr_(Doc& doc, std::stack<InputStackState>& input_stack)
@@ -164,6 +174,9 @@ bool reduce_struct_(Doc& doc, std::stack<InputStackState>& input_stack)
     if (top.kind != 0) {
         return false;
     }
+
+    if (top.kind == 1)
+        return true;
 
     auto tok = top.tok;
     if (tok != IDENTIFIER) {
@@ -357,7 +370,7 @@ std::vector<CompletionResult> completion(Doc& doc, std::string const& input)
             auto const& ty = sym->getType();
             auto ftypename = ty.getCompleteString(true, false, false);
 
-            CompletionResult r = {sym->getName().c_str(), 6, ftypename.c_str(), ""};
+            CompletionResult r = {sym->getName().c_str(), CompletionItemKind::Field, ftypename.c_str(), ""};
             results.push_back(r);
         }
         return results;
