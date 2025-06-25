@@ -99,9 +99,202 @@ static bool AddContextSpecificSymbols(const TBuiltInResource* resources, TInfoSi
     return true;
 }
 
-std::vector<CompletionResult> completion_variable(Doc& doc, std::string const& prefix)
+struct InputStackState {
+    int kind; // 0 for lex. 1 for struct 2 for arr 3 scalar
+    const glslang::TType* ttype;
+    const YYSTYPE* stype;
+    int tok;
+};
+
+glslang::TIntermSymbol* reduce_symbol_(Doc& doc, YYSTYPE const& stype)
 {
-    auto syms = doc.lookup_symbols_by_prefix(prefix);
+    return doc.lookup_symbol_by_name(stype.lex.string->c_str());
+}
+
+bool reduce_subscript_(Doc& doc, std::stack<InputStackState>& input_stack)
+{
+    while (!input_stack.empty() || input_stack.top().tok != LEFT_BRACKET) {
+        input_stack.pop();
+    }
+
+    if (input_stack.empty()) {
+        return false;
+    }
+
+    input_stack.pop();
+    auto& top = input_stack.top();
+    if (top.kind != 2) {
+        return false;
+    }
+
+    auto* ttype = top.ttype;
+}
+
+bool reduce_arr_(Doc& doc, std::stack<InputStackState>& input_stack)
+{
+    auto& top = input_stack.top();
+    if (top.kind != 0 || top.tok != IDENTIFIER) {
+        return false;
+    }
+
+    auto* sym = doc.lookup_symbol_by_name(top.stype->lex.string->c_str());
+    if (!sym) {
+        return false;
+    }
+
+    const auto* type = &sym->getType();
+    if (type->isReference()) {
+        type = type->getReferentType();
+    }
+
+    if (!type->isArray()) {
+        return false;
+    }
+
+    top.kind = 2;
+    top.ttype = type;
+    return true;
+}
+
+bool reduce_struct_(Doc& doc, std::stack<InputStackState>& input_stack)
+{
+    auto& top = input_stack.top();
+
+    // not lex tok
+    if (top.kind != 0) {
+        return false;
+    }
+
+    auto tok = top.tok;
+    if (tok != IDENTIFIER) {
+        return false;
+    }
+
+    auto* sym = doc.lookup_symbol_by_name(top.stype->lex.string->c_str());
+    if (!sym) {
+        return false;
+    }
+
+    const auto* type = &sym->getType();
+    if (type->isReference()) {
+        type = type->getReferentType();
+    }
+
+    if (!type->isStruct()) {
+        return false;
+    }
+
+    top.kind = 1;
+    top.ttype = type;
+    return true;
+}
+
+bool complete_by_prefix(Doc& doc, const std::stack<InputStackState>& input_stack, std::string const& prefix,
+                        std::vector<CompletionResult>& results)
+{
+    if (input_stack.empty()) {
+        auto symbols = doc.lookup_symbols_by_prefix(prefix);
+        if (symbols.empty()) {
+            return false;
+        }
+
+        for (auto const& sym : symbols) {
+            auto const* type = &sym->getType();
+            if (type->isReference()) {
+                type = type->getReferentType();
+            }
+
+            auto detail = type->getCompleteString(true, false, false);
+            results.push_back({sym->getName().c_str(), CompletionItemKind::Variable, detail.c_str(), ""});
+        }
+    } else {
+        auto& state = input_stack.top();
+        const auto* type = state.ttype;
+        if (type->isReference()) {
+            type = type->getReferentType();
+        }
+
+        if (!type->isStruct()) {
+            std::cerr << "complete prefix must followed struct variable." << std::endl;
+            return false;
+        }
+
+        auto match_prefix = [&prefix](std::string const& field) {
+            if (prefix.empty())
+                return true;
+
+            return prefix == field.substr(0, prefix.size());
+        };
+
+        const auto* members = type->getStruct();
+        for (int i = 0; i < members->size(); ++i) {
+            const auto* field = (*members)[i].type;
+            auto label = field->getFieldName();
+            if (!match_prefix(label.c_str())) {
+                continue;
+            }
+
+            auto detail = field->getCompleteString(true, false, false);
+            results.push_back({label.c_str(), CompletionItemKind::Field, detail.c_str(), ""});
+        }
+    }
+
+    return true;
+}
+
+std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tuple<YYSTYPE, int>> const& lex_info)
+{
+    //very tiny varaible exp parser
+    static std::vector<std::vector<int>> completion_rules = {
+        {IDENTIFIER},
+        {IDENTIFIER, DOT},
+        {IDENTIFIER, DOT, IDENTIFIER},
+        {IDENTIFIER, LEFT_BRACKET, INTCONSTANT, RIGHT_BRACKET},
+        {IDENTIFIER, LEFT_BRACKET, IDENTIFIER, RIGHT_BRACKET},
+    };
+
+    std::vector<CompletionResult> results;
+    std::stack<InputStackState> input_stack;
+
+#define START 0
+#define END -1
+#define EXPECT_DOT_BRACKET 1
+#define EXPECT_IDENTIFIER 2
+#define EXPECT_IDENTIFIER_OR_CONST 3
+
+    int state = EXPECT_IDENTIFIER;
+    glslang::TType* type = nullptr;
+    //0 tok for start, -1 tok for end
+    for (int i = 0; i < lex_info.size() - 1; ++i) {
+        auto const& [stype, tok] = lex_info[i];
+        switch (state) {
+        case START:
+            if (tok == IDENTIFIER) {
+                input_stack.push({0, nullptr, &stype, tok});
+                state = EXPECT_DOT_BRACKET;
+            } else {
+                // err
+                return results;
+            }
+            break;
+        case EXPECT_DOT_BRACKET:
+            if (tok == DOT) {
+                if (!reduce_struct_(doc, input_stack)) {
+                    return results;
+                }
+
+                input_stack.push({0, nullptr, &stype, tok});
+                state = EXPECT_IDENTIFIER;
+                break;
+            } else if (tok == LEFT_BRACKET) {
+                if (!reduce_arr_(doc, input_stack)) {
+                    return results;
+                }
+                input_stack.push({0, nullptr, &stype, tok});
+            } else if (tok == LEFT_BRACKET) {
+            }
+        }
+    }
 }
 
 std::vector<CompletionResult> completion(Doc& doc, std::string const& input)
@@ -170,24 +363,5 @@ std::vector<CompletionResult> completion(Doc& doc, std::string const& input)
         return results;
     }
 
-    auto* base_sym = doc.lookup_symbol_by_name(stype.lex.string->c_str());
-    const glslang::TType* type = &base_sym->getType();
-
-    int i = 1;
-    int state = 0; // no left bracket
-    while (i < input_toks.size()) {
-        auto& [stype, tok] = input_toks[i];
-        if (tok == DOT && !type->isStruct()) {
-            return {};
-        }
-
-        if (tok == LEFT_BRACKET) {
-            if (state) {
-                return {};
-            }
-
-            if (!type->isArray())
-                return {};
-        }
-    }
+    input_toks.push_back({YYSTYPE{}, -1});
 }
