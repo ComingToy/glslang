@@ -315,7 +315,31 @@ bool complete_by_prefix(Doc& doc, const std::stack<InputStackState>& input_stack
     return true;
 }
 
-void do_complete_exp_(Doc& doc, std::stack<InputStackState>& input_stack, std::vector<CompletionResult>& results) {}
+void do_complete_exp_(Doc& doc, std::stack<InputStackState>& input_stack, std::vector<CompletionResult>& results)
+{
+    if (input_stack.top().kind != 0) {
+        return;
+    }
+
+    auto input = input_stack.top();
+    input_stack.pop();
+
+    if (input.tok == IDENTIFIER) {
+        auto top = input_stack.top();
+        if (top.kind != 0) {
+            auto symbols = doc.lookup_symbols_by_prefix(input.stype->lex.string->c_str());
+            for (auto* sym : symbols) {
+                CompletionResult r = {sym->getName().c_str(), CompletionItemKind::Variable,
+                                      sym->getType().getCompleteString(true, false, false).c_str(), ""};
+                results.emplace_back(r);
+            }
+        } else if (top.tok == DOT) {
+            input_stack.pop();
+            if (input_stack.top().kind != 1) {
+            }
+        }
+    }
+}
 
 std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tuple<YYSTYPE, int>> const& lex_info)
 {
