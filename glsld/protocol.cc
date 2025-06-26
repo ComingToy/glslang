@@ -293,14 +293,17 @@ void Protocol::completion_(nlohmann::json& req)
     std::string uri = params["textDocument"]["uri"];
 
     auto term = workspace_.get_term(uri, line, col);
-    auto is_field = term.find(".") != std::string::npos;
+
+    auto complete_results = completion(*workspace_.get_doc(uri), term);
 
     nlohmann::json completion_items;
-    if (is_field) {
-        completion_items = complete_field_(uri, term);
-		completion(*workspace_.get_doc(uri), term);
-    } else {
-        completion_items = complete_variable_(uri, term);
+    for (auto const& result : complete_results) {
+        nlohmann::json item;
+        item["label"] = result.label;
+        item["kind"] = int(result.kind);
+        item["detail"] = result.detail;
+        item["documentation"] = result.documentation;
+        completion_items.push_back(item);
     }
 
     make_response_(req, &completion_items);

@@ -104,14 +104,15 @@ struct InputStackState {
     const glslang::TType* ttype;
     const YYSTYPE* stype;
     int tok;
+    int reduce_n_ = 0;
 };
 
-glslang::TIntermSymbol* reduce_symbol_(Doc& doc, YYSTYPE const& stype)
+static glslang::TIntermSymbol* reduce_symbol_(Doc& doc, YYSTYPE const& stype)
 {
     return doc.lookup_symbol_by_name(stype.lex.string->c_str());
 }
 
-bool reduce_field_(Doc& doc, std::stack<InputStackState>& input_stack)
+static bool reduce_field_(Doc& doc, std::stack<InputStackState>& input_stack)
 {
     auto field = input_stack.top();
     input_stack.pop();
@@ -165,9 +166,9 @@ bool reduce_field_(Doc& doc, std::stack<InputStackState>& input_stack)
     return true;
 }
 
-bool reduce_subscript_(Doc& doc, std::stack<InputStackState>& input_stack)
+static bool reduce_subscript_(Doc& doc, std::stack<InputStackState>& input_stack)
 {
-    while (!input_stack.empty() || input_stack.top().tok != LEFT_BRACKET) {
+    while (!input_stack.empty() && input_stack.top().tok != LEFT_BRACKET) {
         input_stack.pop();
     }
 
@@ -182,8 +183,22 @@ bool reduce_subscript_(Doc& doc, std::stack<InputStackState>& input_stack)
     }
 
     auto* ttype = top.ttype;
-    auto array = ttype->getArraySizes();
-    auto node = array->getDimNode(0);
+    auto sizes = ttype->getArraySizes();
+    if (top.reduce_n_ >= sizes->getNumDims()) {
+        return false;
+    }
+
+    top.reduce_n_ += 1;
+
+    if (top.reduce_n_ == sizes->getNumDims()) {
+        if (top.ttype->isStruct()) {
+            top.kind = 1;
+        } else {
+            top.kind = 3;
+        }
+    }
+
+#if 0
     if (node->isArray()) {
         top.kind = 2;
     } else if (node->isStruct()) {
@@ -193,10 +208,11 @@ bool reduce_subscript_(Doc& doc, std::stack<InputStackState>& input_stack)
     }
 
     top.ttype = &node->getType();
+#endif
     return true;
 }
 
-bool reduce_arr_(Doc& doc, std::stack<InputStackState>& input_stack)
+static bool reduce_arr_(Doc& doc, std::stack<InputStackState>& input_stack)
 {
     auto& top = input_stack.top();
     if (top.kind == 2) {
@@ -226,12 +242,12 @@ bool reduce_arr_(Doc& doc, std::stack<InputStackState>& input_stack)
     return true;
 }
 
-bool reduce_struct_(Doc& doc, std::stack<InputStackState>& input_stack)
+static bool reduce_struct_(Doc& doc, std::stack<InputStackState>& input_stack)
 {
     auto& top = input_stack.top();
 
     // not lex tok
-    if (top.kind != 0) {
+    if (top.kind != 0 && top.kind != 1) {
         return false;
     }
 
@@ -262,60 +278,7 @@ bool reduce_struct_(Doc& doc, std::stack<InputStackState>& input_stack)
     return true;
 }
 
-bool complete_by_prefix(Doc& doc, const std::stack<InputStackState>& input_stack, std::string const& prefix,
-                        std::vector<CompletionResult>& results)
-{
-    if (input_stack.empty()) {
-        auto symbols = doc.lookup_symbols_by_prefix(prefix);
-        if (symbols.empty()) {
-            return false;
-        }
-
-        for (auto const& sym : symbols) {
-            auto const* type = &sym->getType();
-            if (type->isReference()) {
-                type = type->getReferentType();
-            }
-
-            auto detail = type->getCompleteString(true, false, false);
-            results.push_back({sym->getName().c_str(), CompletionItemKind::Variable, detail.c_str(), ""});
-        }
-    } else {
-        auto& state = input_stack.top();
-        const auto* type = state.ttype;
-        if (type->isReference()) {
-            type = type->getReferentType();
-        }
-
-        if (!type->isStruct()) {
-            std::cerr << "complete prefix must followed struct variable." << std::endl;
-            return false;
-        }
-
-        auto match_prefix = [&prefix](std::string const& field) {
-            if (prefix.empty())
-                return true;
-
-            return prefix == field.substr(0, prefix.size());
-        };
-
-        const auto* members = type->getStruct();
-        for (int i = 0; i < members->size(); ++i) {
-            const auto* field = (*members)[i].type;
-            auto label = field->getFieldName();
-            if (!match_prefix(label.c_str())) {
-                continue;
-            }
-
-            auto detail = field->getCompleteString(true, false, false);
-            results.push_back({label.c_str(), CompletionItemKind::Field, detail.c_str(), ""});
-        }
-    }
-
-    return true;
-}
-
-void do_complete_exp_(Doc& doc, std::stack<InputStackState>& input_stack, std::vector<CompletionResult>& results)
+static void do_complete_exp_(Doc& doc, std::stack<InputStackState>& input_stack, std::vector<CompletionResult>& results)
 {
     if (input_stack.top().kind != 0) {
         return;
@@ -325,7 +288,21 @@ void do_complete_exp_(Doc& doc, std::stack<InputStackState>& input_stack, std::v
     input_stack.pop();
 
     if (input.tok == IDENTIFIER) {
+        std::string prefix = input.stype->lex.string->c_str();
+        if (input_stack.empty()) {
+            auto symbols = doc.lookup_symbols_by_prefix(prefix);
+            for (auto const& sym : symbols) {
+                auto detail = sym->getType().getCompleteString(true, false, false);
+
+                CompletionResult r = {sym->getName().c_str(), CompletionItemKind::Variable,
+                                      sym->getType().getCompleteString(true, false, false).c_str(), ""};
+                results.emplace_back(r);
+            }
+            return;
+        }
+
         auto top = input_stack.top();
+        input_stack.pop();
         if (top.kind != 0) {
             auto symbols = doc.lookup_symbols_by_prefix(input.stype->lex.string->c_str());
             for (auto* sym : symbols) {
@@ -334,14 +311,54 @@ void do_complete_exp_(Doc& doc, std::stack<InputStackState>& input_stack, std::v
                 results.emplace_back(r);
             }
         } else if (top.tok == DOT) {
-            input_stack.pop();
-            if (input_stack.top().kind != 1) {
+            if (input_stack.empty())
+                return;
+            auto& [kind, ttype, stype, tok, _] = input_stack.top();
+            if (kind != 1) {
+                return;
             }
+
+            auto match_prefix = [&prefix](std::string const& field) {
+                if (prefix.empty())
+                    return true;
+
+                return prefix == field.substr(0, prefix.size());
+            };
+
+            auto& members = *ttype->getStruct();
+            for (int i = 0; i < members.size(); ++i) {
+                auto field = members[i].type;
+                auto label = field->getFieldName().c_str();
+                auto kind = CompletionItemKind::Field;
+                auto detail = field->getCompleteString(true, false, false);
+                auto doc = "";
+                if (match_prefix(label)) {
+                    results.push_back({label, kind, detail.c_str(), doc});
+                }
+            }
+        }
+    } else if (input.tok == DOT) {
+        if (input_stack.empty())
+            return;
+
+        auto& [kind, ttype, stype, tok, _] = input_stack.top();
+        if (kind != 1) {
+            return;
+        }
+
+        auto& members = *ttype->getStruct();
+        for (int i = 0; i < members.size(); ++i) {
+            auto field = members[i].type;
+            auto label = field->getFieldName().c_str();
+            auto kind = CompletionItemKind::Field;
+            auto detail = field->getCompleteString(true, false, false);
+            auto doc = "";
+            results.push_back({label, kind, detail.c_str(), doc});
         }
     }
 }
 
-std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tuple<YYSTYPE, int>> const& lex_info)
+static std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tuple<YYSTYPE, int>> const& lex_info)
 {
     //very tiny varaible exp parser
     static std::vector<std::vector<int>> completion_rules = {
@@ -484,22 +501,6 @@ std::vector<CompletionResult> completion(Doc& doc, std::string const& input)
     if (input_toks.empty())
         return {};
 
-    auto& [stype, tok] = input_toks.front();
-    if (tok != IDENTIFIER) {
-        return {};
-    }
-
-    std::vector<CompletionResult> results;
-    if (input_toks.size() == 1) {
-        for (auto& sym : doc.lookup_symbols_by_prefix(stype.lex.string->c_str())) {
-            auto const& ty = sym->getType();
-            auto ftypename = ty.getCompleteString(true, false, false);
-
-            CompletionResult r = {sym->getName().c_str(), CompletionItemKind::Field, ftypename.c_str(), ""};
-            results.push_back(r);
-        }
-        return results;
-    }
-
     input_toks.push_back({YYSTYPE{}, -1});
+    return do_complete(doc, input_toks);
 }

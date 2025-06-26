@@ -77,7 +77,7 @@ std::string Workspace::get_term(std::string const& uri, const int line, const in
     auto pos = text.rbegin() + (text.size() - col);
     std::vector<char> buf;
     for (; pos != text.rend(); ++pos) {
-        if (*pos == ' ')
+        if (*pos == ';')
             break;
         buf.push_back(*pos);
     }
