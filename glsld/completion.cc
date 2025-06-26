@@ -259,12 +259,35 @@ static bool reduce_struct_(Doc& doc, std::stack<InputStackState>& input_stack)
         return false;
     }
 
+    const glslang::TType* type = nullptr;
     auto* sym = doc.lookup_symbol_by_name(top.stype->lex.string->c_str());
-    if (!sym) {
-        return false;
+    if (sym) {
+        type = &sym->getType();
+    } else {
+        auto anons = doc.lookup_symbols_by_prefix("anon@");
+        for (auto anon : anons) {
+            if (type)
+                break;
+
+            if (!anon->isStruct()) {
+                continue;
+            }
+
+            auto& members = *anon->getType().getStruct();
+            for (int i = 0; i < members.size(); ++i) {
+                auto member = members[i].type;
+                std::string field = member->getFieldName().c_str();
+                if (field == top.stype->lex.string->c_str()) {
+                    type = member;
+                    break;
+                }
+            }
+        }
     }
 
-    const auto* type = &sym->getType();
+    if (!type)
+        return false;
+
     if (type->isReference()) {
         type = type->getReferentType();
     }
@@ -276,6 +299,41 @@ static bool reduce_struct_(Doc& doc, std::stack<InputStackState>& input_stack)
     top.kind = 1;
     top.ttype = type;
     return true;
+}
+
+static void do_complete_var_prefix_(Doc& doc, std::string const& prefix, std::vector<CompletionResult>& results)
+{
+    auto symbols = doc.lookup_symbols_by_prefix(prefix);
+    for (auto const& sym : symbols) {
+        auto detail = sym->getType().getCompleteString(true, false, false);
+
+        CompletionResult r = {sym->getName().c_str(), CompletionItemKind::Variable,
+                              sym->getType().getCompleteString(true, false, false).c_str(), ""};
+        results.emplace_back(r);
+    }
+}
+
+static void do_complete_struct_field_(const glslang::TType* ttype, std::string const& prefix,
+                                      std::vector<CompletionResult>& results)
+{
+    auto match_prefix = [&prefix](std::string const& field) {
+        if (prefix.empty())
+            return true;
+
+        return prefix == field.substr(0, prefix.size());
+    };
+
+    auto& members = *ttype->getStruct();
+    for (int i = 0; i < members.size(); ++i) {
+        auto field = members[i].type;
+        auto label = field->getFieldName().c_str();
+        auto kind = CompletionItemKind::Field;
+        auto detail = field->getCompleteString(true, false, false);
+        auto doc = "";
+        if (match_prefix(label)) {
+            results.push_back({label, kind, detail.c_str(), doc});
+        }
+    }
 }
 
 static void do_complete_exp_(Doc& doc, std::stack<InputStackState>& input_stack, std::vector<CompletionResult>& results)
@@ -290,13 +348,12 @@ static void do_complete_exp_(Doc& doc, std::stack<InputStackState>& input_stack,
     if (input.tok == IDENTIFIER) {
         std::string prefix = input.stype->lex.string->c_str();
         if (input_stack.empty()) {
-            auto symbols = doc.lookup_symbols_by_prefix(prefix);
-            for (auto const& sym : symbols) {
-                auto detail = sym->getType().getCompleteString(true, false, false);
-
-                CompletionResult r = {sym->getName().c_str(), CompletionItemKind::Variable,
-                                      sym->getType().getCompleteString(true, false, false).c_str(), ""};
-                results.emplace_back(r);
+            do_complete_var_prefix_(doc, prefix, results);
+            auto anons = doc.lookup_symbols_by_prefix("anon@");
+            for (auto* anon : anons) {
+                if (anon->isStruct()) {
+                    do_complete_struct_field_(&anon->getType(), prefix, results);
+                }
             }
             return;
         }
@@ -318,24 +375,7 @@ static void do_complete_exp_(Doc& doc, std::stack<InputStackState>& input_stack,
                 return;
             }
 
-            auto match_prefix = [&prefix](std::string const& field) {
-                if (prefix.empty())
-                    return true;
-
-                return prefix == field.substr(0, prefix.size());
-            };
-
-            auto& members = *ttype->getStruct();
-            for (int i = 0; i < members.size(); ++i) {
-                auto field = members[i].type;
-                auto label = field->getFieldName().c_str();
-                auto kind = CompletionItemKind::Field;
-                auto detail = field->getCompleteString(true, false, false);
-                auto doc = "";
-                if (match_prefix(label)) {
-                    results.push_back({label, kind, detail.c_str(), doc});
-                }
-            }
+            do_complete_struct_field_(ttype, prefix, results);
         }
     } else if (input.tok == DOT) {
         if (input_stack.empty())

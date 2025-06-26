@@ -295,6 +295,8 @@ void Protocol::completion_(nlohmann::json& req)
     auto term = workspace_.get_term(uri, line, col);
 
     auto complete_results = completion(*workspace_.get_doc(uri), term);
+    auto complete_results1 = completion(*workspace_.get_doc(uri), "anon@0." + term);
+    complete_results.insert(complete_results.end(), complete_results1.begin(), complete_results1.end());
 
     nlohmann::json completion_items;
     for (auto const& result : complete_results) {
