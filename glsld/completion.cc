@@ -361,14 +361,6 @@ static void do_complete_exp_(Doc& doc, std::stack<InputStackState>& input_stack,
 static std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tuple<YYSTYPE, int>> const& lex_info)
 {
     //very tiny varaible exp parser
-    static std::vector<std::vector<int>> completion_rules = {
-        {IDENTIFIER},
-        {IDENTIFIER, DOT},
-        {IDENTIFIER, DOT, IDENTIFIER},
-        {IDENTIFIER, LEFT_BRACKET, INTCONSTANT, RIGHT_BRACKET},
-        {IDENTIFIER, LEFT_BRACKET, IDENTIFIER, RIGHT_BRACKET},
-    };
-
     std::vector<CompletionResult> results;
     std::stack<InputStackState> input_stack;
 
