@@ -12,6 +12,9 @@ public:
     struct FunctionDefDesc {
         glslang::TIntermAggregate* def;
         std::vector<glslang::TIntermSymbol*> args;
+		std::vector<glslang::TIntermSymbol*> local_defs;
+		std::vector<glslang::TIntermSymbol*> local_uses;
+		glslang::TSourceLoc start, end;
     };
 
     Doc();
@@ -60,9 +63,9 @@ private:
         EShLanguage language;
         std::unique_ptr<glslang::TShader> shader;
         std::map<int, std::vector<TIntermNode*>> nodes_by_line;
-        std::map<long long, glslang::TIntermSymbol*> sym_defs;
-        std::vector<glslang::TIntermSymbol*> symbols;
         std::vector<FunctionDefDesc> func_defs;
+		std::vector<glslang::TIntermSymbol*> globals;
+        std::vector<glslang::TIntermSymbol*> uses;
         int ref = 1;
     };
 

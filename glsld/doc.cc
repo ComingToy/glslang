@@ -218,18 +218,28 @@ void Doc::release_()
     }
 }
 
-class AllTypesAndSymbolsVisitor_ : public glslang::TIntermTraverser {
+struct LocalDefUseExtractor : public glslang::TIntermTraverser {
+public:
+    std::vector<glslang::TIntermSymbol*> defs, uses;
+    void visitSymbol(glslang::TIntermSymbol* symbol) override { uses.push_back(symbol); }
+    bool visitUnary(glslang::TVisit v, glslang::TIntermUnary* unary) override
+    {
+        (void)v;
+        if (unary->getOp() == glslang::EOpDeclare) {
+            defs.push_back(unary->getOperand()->getAsSymbolNode());
+            return false;
+        } else {
+            return true;
+        }
+    }
+};
+
+class DocInfoExtractor : public glslang::TIntermTraverser {
 public:
     std::map<int, std::vector<TIntermNode*>> nodes_by_line;
-    std::vector<glslang::TIntermSymbol*> defs;
-    std::vector<Doc::FunctionDefDesc> func_defs;
-    std::vector<glslang::TIntermSymbol*> symbols;
-    void visitSymbol(glslang::TIntermSymbol* symbol) override
-    {
-        nodes_by_line[symbol->getLoc().line].push_back(symbol);
-        symbols.push_back(symbol);
-    }
-
+    std::vector<glslang::TIntermSymbol*> uses;
+    std::vector<glslang::TIntermSymbol*> globals;
+    std::vector<Doc::FunctionDefDesc> funcs;
     bool visitBinary(glslang::TVisit, glslang::TIntermBinary* node) override
     {
         if (node->getOp() == glslang::EOpIndexDirectStruct || node->getOp() == glslang::EOpIndexDirect ||
@@ -249,7 +259,7 @@ public:
                 auto loc = sym->getLoc();
                 if (!loc.name) // builtin
                     continue;
-                defs.push_back(sym);
+                globals.push_back(sym);
             }
             return false;
         }
@@ -260,44 +270,37 @@ public:
                       << " return type: " << agg->getType().getCompleteString() << " has " << agg->getSequence().size()
                       << " sub nodes" << std::endl;
 
-            auto& children = agg->getSequence();
-            std::vector<glslang::TIntermSymbol*> args;
-            for (auto child : children) {
-                auto* op = child->getAsAggregate();
-                if (!op) {
-                    continue;
-                }
+            struct Doc::FunctionDefDesc function_def = {.def = agg, .start = agg->getLoc(), .end = agg->getEndLoc()};
 
-                if (op->getOp() == glslang::EOpParameters) {
-                    for (auto& arg : op->getSequence()) {
-                        auto* sym = arg->getAsSymbolNode();
-                        if (sym) {
-                            std::cerr << "arg: " << sym->getName() << std::endl;
-                            args.push_back(sym);
-                            defs.push_back(sym);
-                        }
-                    }
-                }
+            auto& children = agg->getSequence();
+            if (children.size() != 2) {
+                return true;
             }
 
-            func_defs.push_back({agg, args});
+            std::vector<glslang::TIntermSymbol*> args;
+            auto* params = children[0]->getAsAggregate();
+            if (!params || params->getOp() != glslang::EOpParameters) {
+                return true;
+            }
+
+            for (auto* arg : params->getSequence()) {
+                if (arg->getAsSymbolNode())
+                    function_def.args.push_back(arg->getAsSymbolNode());
+            }
+
+            auto* body = children[1];
+            LocalDefUseExtractor extractor;
+            body->traverse(&extractor);
+            function_def.local_defs.swap(extractor.defs);
+            function_def.local_uses.swap(extractor.uses);
+            return false;
         }
 
         return true;
     }
 
     void visitConstantUnion(glslang::TIntermConstantUnion* node) override {}
-
-    bool visitUnary(glslang::TVisit v, glslang::TIntermUnary* unary) override
-    {
-        (void)v;
-        if (unary->getOp() == glslang::EOpDeclare) {
-            defs.push_back(unary->getOperand()->getAsSymbolNode());
-            return false;
-        } else {
-            return true;
-        }
-    }
+    bool visitUnary(glslang::TVisit v, glslang::TIntermUnary* unary) override {}
 };
 
 bool Doc::parse(std::vector<std::string> const& include_dirs)
@@ -307,9 +310,9 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
 
     resource_->shader = std::make_unique<glslang::TShader>(language());
     resource_->nodes_by_line.clear();
-    resource_->sym_defs.clear();
+    resource_->globals.clear();
     resource_->func_defs.clear();
-    resource_->symbols.clear();
+    resource_->uses.clear();
 
     auto& shader = *resource_->shader;
     std::string preambles;
