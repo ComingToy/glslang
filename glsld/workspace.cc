@@ -49,7 +49,7 @@ glslang::TSourceLoc Workspace::locate_symbol_def(std::string const& uri, const i
         return {.name = nullptr, .column = 0, .line = 0};
 
     auto nodes = lookup_nodes_at(uri, line, col);
-	auto* func = docs_[uri].lookup_func_by_line(line);
+    auto* func = docs_[uri].lookup_func_by_line(line);
 
     for (auto& node : nodes) {
         if (node.kind == Doc::LookupResult::Kind::SYMBOL) {
@@ -87,24 +87,32 @@ std::string Workspace::get_term(std::string const& uri, const int line, const in
     return prefix;
 }
 
-std::vector<glslang::TIntermSymbol*> Workspace::lookup_symbols_by_prefix(std::string const& uri,
-                                                                         std::string const& prefix)
+std::vector<glslang::TIntermSymbol*>
+Workspace::lookup_symbols_by_prefix(std::string const& uri, Doc::FunctionDefDesc* func, std::string const& prefix)
 {
-    auto syms = docs_[uri].lookup_symbols_by_prefix(prefix);
+    auto syms = docs_[uri].lookup_symbols_by_prefix(func, prefix);
     for (auto* sym : syms) {
         std::cerr << "find symbol: " << sym->getName() << std::endl;
     }
     return syms;
 }
 
-glslang::TIntermSymbol* Workspace::lookup_symbol_by_name(std::string const& uri, std::string const& name)
+glslang::TIntermSymbol* Workspace::lookup_symbol_by_name(std::string const& uri, Doc::FunctionDefDesc* func,
+                                                         std::string const& name)
 {
     if (docs_.count(uri) <= 0) {
         return nullptr;
     }
 
     auto& doc = docs_[uri];
-    return doc.lookup_symbol_by_name(name);
+    return doc.lookup_symbol_by_name(func, name);
+}
+
+Doc::FunctionDefDesc* Workspace::get_func_by_line(const std::string& uri, const int line)
+{
+    if (docs_.count(uri) <= 0)
+        return nullptr;
+    return docs_[uri].lookup_func_by_line(line);
 }
 
 Doc* Workspace::get_doc(std::string const& uri)

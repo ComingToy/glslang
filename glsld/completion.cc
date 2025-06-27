@@ -107,10 +107,6 @@ struct InputStackState {
     int reduce_n_ = 0;
 };
 
-static glslang::TIntermSymbol* reduce_symbol_(Doc& doc, YYSTYPE const& stype)
-{
-    return doc.lookup_symbol_by_name(stype.lex.string->c_str());
-}
 
 static bool reduce_field_(Doc& doc, std::stack<InputStackState>& input_stack)
 {
@@ -212,7 +208,7 @@ static bool reduce_subscript_(Doc& doc, std::stack<InputStackState>& input_stack
     return true;
 }
 
-static bool reduce_arr_(Doc& doc, std::stack<InputStackState>& input_stack)
+static bool reduce_arr_(Doc& doc, const int line, const int col, std::stack<InputStackState>& input_stack)
 {
     auto& top = input_stack.top();
     if (top.kind == 2) {
@@ -223,7 +219,8 @@ static bool reduce_arr_(Doc& doc, std::stack<InputStackState>& input_stack)
         return false;
     }
 
-    auto* sym = doc.lookup_symbol_by_name(top.stype->lex.string->c_str());
+	auto* func = doc.lookup_func_by_line(line);
+    auto* sym = doc.lookup_symbol_by_name(func, top.stype->lex.string->c_str());
     if (!sym) {
         return false;
     }
@@ -242,7 +239,7 @@ static bool reduce_arr_(Doc& doc, std::stack<InputStackState>& input_stack)
     return true;
 }
 
-static bool reduce_struct_(Doc& doc, std::stack<InputStackState>& input_stack)
+static bool reduce_struct_(Doc& doc, const int line, const int col, std::stack<InputStackState>& input_stack)
 {
     auto& top = input_stack.top();
 
@@ -260,11 +257,12 @@ static bool reduce_struct_(Doc& doc, std::stack<InputStackState>& input_stack)
     }
 
     const glslang::TType* type = nullptr;
-    auto* sym = doc.lookup_symbol_by_name(top.stype->lex.string->c_str());
+	auto* func = doc.lookup_func_by_line(line);
+    auto* sym = doc.lookup_symbol_by_name(func, top.stype->lex.string->c_str());
     if (sym) {
         type = &sym->getType();
     } else {
-        auto anons = doc.lookup_symbols_by_prefix("anon@");
+        auto anons = doc.lookup_symbols_by_prefix(nullptr, "anon@");
         for (auto anon : anons) {
             if (type)
                 break;
@@ -301,9 +299,11 @@ static bool reduce_struct_(Doc& doc, std::stack<InputStackState>& input_stack)
     return true;
 }
 
-static void do_complete_var_prefix_(Doc& doc, std::string const& prefix, std::vector<CompletionResult>& results)
+static void do_complete_var_prefix_(Doc& doc, const int line, const int col, std::string const& prefix,
+                                    std::vector<CompletionResult>& results)
 {
-    auto symbols = doc.lookup_symbols_by_prefix(prefix);
+    auto* func = doc.lookup_func_by_line(line);
+    auto symbols = doc.lookup_symbols_by_prefix(func, prefix);
     for (auto const& sym : symbols) {
         auto detail = sym->getType().getCompleteString(true, false, false);
 
@@ -336,7 +336,8 @@ static void do_complete_struct_field_(const glslang::TType* ttype, std::string c
     }
 }
 
-static void do_complete_exp_(Doc& doc, std::stack<InputStackState>& input_stack, std::vector<CompletionResult>& results)
+static void do_complete_exp_(Doc& doc, const int line, const int col, std::stack<InputStackState>& input_stack,
+                             std::vector<CompletionResult>& results)
 {
     if (input_stack.top().kind != 0) {
         return;
@@ -348,8 +349,8 @@ static void do_complete_exp_(Doc& doc, std::stack<InputStackState>& input_stack,
     if (input.tok == IDENTIFIER) {
         std::string prefix = input.stype->lex.string->c_str();
         if (input_stack.empty()) {
-            do_complete_var_prefix_(doc, prefix, results);
-            auto anons = doc.lookup_symbols_by_prefix("anon@");
+            do_complete_var_prefix_(doc, line, col, prefix, results);
+            auto anons = doc.lookup_symbols_by_prefix(nullptr, "anon@");
             for (auto* anon : anons) {
                 if (anon->isStruct()) {
                     do_complete_struct_field_(&anon->getType(), prefix, results);
@@ -361,7 +362,8 @@ static void do_complete_exp_(Doc& doc, std::stack<InputStackState>& input_stack,
         auto top = input_stack.top();
         input_stack.pop();
         if (top.kind != 0) {
-            auto symbols = doc.lookup_symbols_by_prefix(input.stype->lex.string->c_str());
+            auto* func = doc.lookup_func_by_line(line);
+            auto symbols = doc.lookup_symbols_by_prefix(func, input.stype->lex.string->c_str());
             for (auto* sym : symbols) {
                 CompletionResult r = {sym->getName().c_str(), CompletionItemKind::Variable,
                                       sym->getType().getCompleteString(true, false, false).c_str(), ""};
@@ -398,7 +400,8 @@ static void do_complete_exp_(Doc& doc, std::stack<InputStackState>& input_stack,
     }
 }
 
-static std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tuple<YYSTYPE, int>> const& lex_info)
+static std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tuple<YYSTYPE, int>> const& lex_info,
+                                                 const int line, const int col)
 {
     //very tiny varaible exp parser
     std::vector<CompletionResult> results;
@@ -417,7 +420,7 @@ static std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tupl
         if (tok == -1) {
             //do complete at end
             if (input_stack.top().kind == 0) {
-                do_complete_exp_(doc, input_stack, results);
+                do_complete_exp_(doc, line, col, input_stack, results);
             }
 
             return results;
@@ -435,7 +438,7 @@ static std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tupl
             break;
         case EXPECT_DOT_LBRACKET:
             if (tok == DOT) {
-                if (!reduce_struct_(doc, input_stack)) {
+                if (!reduce_struct_(doc, line, col, input_stack)) {
                     return results;
                 }
 
@@ -443,7 +446,7 @@ static std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tupl
                 state = EXPECT_IDENTIFIER;
                 break;
             } else if (tok == LEFT_BRACKET) {
-                if (!reduce_arr_(doc, input_stack)) {
+                if (!reduce_arr_(doc, line, col, input_stack)) {
                     return results;
                 }
                 input_stack.push({0, nullptr, &stype, tok});
@@ -484,7 +487,7 @@ static std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tupl
     return results;
 }
 
-std::vector<CompletionResult> completion(Doc& doc, std::string const& input)
+std::vector<CompletionResult> completion(Doc& doc, std::string const& input, const int line, const int col)
 {
     const char* source = input.data();
     size_t len = input.size();
@@ -534,5 +537,5 @@ std::vector<CompletionResult> completion(Doc& doc, std::string const& input)
         return {};
 
     input_toks.push_back({YYSTYPE{}, -1});
-    return do_complete(doc, input_toks);
+    return do_complete(doc, input_toks, line, col);
 }

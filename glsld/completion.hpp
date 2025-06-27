@@ -37,5 +37,5 @@ struct CompletionResult {
     std::string documentation;
 };
 
-extern std::vector<CompletionResult> completion(Doc& doc, std::string const& input);
+extern std::vector<CompletionResult> completion(Doc& doc, std::string const& input, const int line, const int col);
 #endif

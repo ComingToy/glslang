@@ -158,132 +158,6 @@ void Protocol::did_save_(nlohmann::json& req)
     }
 }
 
-static std::vector<std::string> split(const std::string& s, char delim)
-{
-    std::stringstream ss(s);
-    std::string item;
-    std::vector<std::string> elems;
-    while (std::getline(ss, item, delim)) {
-        elems.push_back(item);
-    }
-    return elems;
-}
-
-nlohmann::json Protocol::complete_field_(std::string const& uri, std::string const& input)
-{
-    std::cerr << "completion field with input: " << input << std::endl;
-    nlohmann::json completion_items;
-
-    auto terms = split(input, '.');
-    if (input.back() == '.') {
-        terms.push_back("");
-    }
-
-    auto* sym = workspace_.lookup_symbol_by_name(uri, terms[0]);
-    if (!sym) {
-        return completion_items;
-    }
-
-    std::cerr << "struct variable name: " << terms[0] << std::endl;
-    if (terms.empty())
-        return completion_items;
-
-    std::vector<std::string> selectors;
-    for (auto i = 1; i < (int)terms.size() - 1; ++i) {
-        selectors.push_back(terms[i]);
-        std::cerr << "selector " << terms[i] << std::endl;
-    }
-
-    std::string prefix = "";
-    if (terms.size() >= 2) {
-        prefix = terms.back();
-    }
-
-    std::cerr << "prefix: " << prefix << std::endl;
-
-    auto match_prefix = [&prefix](std::string const& field) {
-        if (prefix.empty())
-            return true;
-
-        return prefix == field.substr(0, prefix.size());
-    };
-
-    auto isstruct =
-        sym->getType().isReference() ? sym->getType().getReferentType()->isStruct() : sym->getType().isStruct();
-    if (!isstruct)
-        return completion_items;
-
-    const auto* members =
-        sym->getType().isReference() ? sym->getType().getReferentType()->getStruct() : sym->getType().getStruct();
-
-    if (!selectors.empty()) {
-        for (auto& selector : selectors) {
-            for (int i = 0; i < members->size(); ++i) {
-                auto* member = (*members)[i].type;
-                if (selector != member->getFieldName().c_str()) {
-                    continue;
-                }
-
-                if (!member->isStruct()) {
-                    return completion_items;
-                }
-
-                members = member->isReference() ? member->getReferentType()->getStruct() : member->getStruct();
-                break;
-            }
-        }
-    }
-
-    for (int i = 0; i < members->size(); ++i) {
-        const auto field = (*members)[i].type;
-        auto label = field->getFieldName();
-        if (!match_prefix(label.c_str())) {
-            continue;
-        }
-        auto ftypename = field->isStruct() ? field->getCompleteString(true, false, false)
-                                           : field->getCompleteString(true, false, false);
-
-        int kind = 5; // field
-        nlohmann::json item;
-        item["label"] = label;
-        item["kind"] = kind;
-        item["detail"] = ftypename;
-
-        std::string documentation = "";
-        item["documentation"] = documentation;
-        completion_items.push_back(item);
-    }
-
-    return completion_items;
-}
-
-nlohmann::json Protocol::complete_variable_(std::string const& uri, std::string const& input)
-{
-    auto symbols = workspace_.lookup_symbols_by_prefix(uri, input);
-
-    nlohmann::json completion_items;
-    for (auto sym : symbols) {
-        std::string label = sym->getName().c_str();
-        const auto& type = sym->getType();
-        auto typname =
-            type.isStruct() ? type.getCompleteString(true, false, false) : type.getCompleteString(true, false, false);
-
-        int kind = 6; //variable
-        std::string detail = typname.c_str();
-        std::string documentation = "";
-
-        nlohmann::json item;
-        item["label"] = label;
-        item["kind"] = kind;
-        item["detail"] = detail;
-        item["documentation"] = documentation;
-
-        completion_items.push_back(item);
-    }
-
-    return completion_items;
-}
-
 void Protocol::completion_(nlohmann::json& req)
 {
     auto& params = req["params"];
@@ -294,8 +168,8 @@ void Protocol::completion_(nlohmann::json& req)
 
     auto term = workspace_.get_term(uri, line, col);
 
-    auto complete_results = completion(*workspace_.get_doc(uri), term);
-    auto complete_results1 = completion(*workspace_.get_doc(uri), "anon@0." + term);
+    auto complete_results = completion(*workspace_.get_doc(uri), term, line, col);
+    auto complete_results1 = completion(*workspace_.get_doc(uri), "anon@0." + term, line, col);
     complete_results.insert(complete_results.end(), complete_results1.begin(), complete_results1.end());
 
     nlohmann::json completion_items;
