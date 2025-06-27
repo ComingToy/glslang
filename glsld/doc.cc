@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <sstream>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -221,6 +222,7 @@ class AllTypesAndSymbolsVisitor_ : public glslang::TIntermTraverser {
 public:
     std::map<int, std::vector<TIntermNode*>> nodes_by_line;
     std::vector<glslang::TIntermSymbol*> defs;
+    std::vector<Doc::FunctionDefDesc> func_defs;
     std::vector<glslang::TIntermSymbol*> symbols;
     void visitSymbol(glslang::TIntermSymbol* symbol) override
     {
@@ -239,20 +241,49 @@ public:
 
     bool visitAggregate(glslang::TVisit, glslang::TIntermAggregate* agg) override
     {
-        if (agg->getOp() != glslang::EOpLinkerObjects) {
-            return true;
+        if (agg->getOp() == glslang::EOpLinkerObjects) {
+            for (auto& obj : agg->getSequence()) {
+                auto sym = obj->getAsSymbolNode();
+                if (!sym)
+                    continue;
+                auto loc = sym->getLoc();
+                if (!loc.name) // builtin
+                    continue;
+                defs.push_back(sym);
+            }
+            return false;
         }
 
-        for (auto& obj : agg->getSequence()) {
-            auto sym = obj->getAsSymbolNode();
-            if (!sym)
-                continue;
-            auto loc = sym->getLoc();
-            if (!loc.name) // builtin
-                continue;
-            defs.push_back(sym);
+        if (agg->getOp() == glslang::EOpFunction) {
+            std::cerr << "found function def " << agg->getName() << " at " << agg->getLoc().getFilename() << ":"
+                      << agg->getLoc().line << ":" << agg->getLoc().column
+                      << " return type: " << agg->getType().getCompleteString() << " has " << agg->getSequence().size()
+                      << " sub nodes" << std::endl;
+
+            auto& children = agg->getSequence();
+            std::vector<glslang::TIntermSymbol*> args;
+            for (auto child : children) {
+                auto* op = child->getAsAggregate();
+                if (!op) {
+                    continue;
+                }
+
+                if (op->getOp() == glslang::EOpParameters) {
+                    for (auto& arg : op->getSequence()) {
+                        auto* sym = arg->getAsSymbolNode();
+                        if (sym) {
+                            std::cerr << "arg: " << sym->getName() << std::endl;
+                            args.push_back(sym);
+                            defs.push_back(sym);
+                        }
+                    }
+                }
+            }
+
+            func_defs.push_back({agg, args});
         }
-        return false;
+
+        return true;
     }
 
     void visitConstantUnion(glslang::TIntermConstantUnion* node) override {}
@@ -276,7 +307,8 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
 
     resource_->shader = std::make_unique<glslang::TShader>(language());
     resource_->nodes_by_line.clear();
-    resource_->defs.clear();
+    resource_->sym_defs.clear();
+    resource_->func_defs.clear();
     resource_->symbols.clear();
 
     auto& shader = *resource_->shader;
@@ -346,16 +378,16 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
 
     for (auto& s : visitor.defs) {
         auto loc = s->getLoc();
-        fprintf(stderr, "symbol %s define at %s:%d:%d\n", s->getName().c_str(), loc.getFilename(), loc.line,
-                loc.column);
-        resource_->defs[s->getId()] = s;
+        fprintf(stderr, "symbol %s define at %s:%d:%d, type desc: %s\n", s->getName().c_str(), loc.getFilename(),
+                loc.line, loc.column, s->getType().getCompleteString(true).c_str());
+        resource_->sym_defs[s->getId()] = s;
     }
 
     for (auto& s : visitor.symbols) {
         std::string name = s->getName().c_str();
         auto loc = s->getLoc();
         fprintf(stderr, "symbol %s use at %s:%d:%d\n", s->getName().c_str(), loc.getFilename(), loc.line, loc.column);
-        if (resource_->defs.count(s->getId()) > 0) {
+        if (resource_->sym_defs.count(s->getId()) > 0) {
             resource_->symbols.push_back(s);
         } else {
             fprintf(stderr, "found symbol %s use but not defined.\n", name.c_str());
@@ -429,8 +461,8 @@ std::vector<Doc::LookupResult> Doc::lookup_nodes_at(const int line, const int co
 
 glslang::TSourceLoc Doc::locate_symbol_def(glslang::TIntermSymbol* target)
 {
-    if (resource_->defs.count(target->getId())) {
-        auto def = resource_->defs[target->getId()];
+    if (resource_->sym_defs.count(target->getId())) {
+        auto def = resource_->sym_defs[target->getId()];
         return def->getLoc();
     }
 
@@ -440,7 +472,7 @@ glslang::TSourceLoc Doc::locate_symbol_def(glslang::TIntermSymbol* target)
 std::vector<glslang::TIntermSymbol*> Doc::lookup_symbols_by_prefix(std::string const& prefix)
 {
     std::vector<glslang::TIntermSymbol*> symbols;
-    for (auto& [id, sym] : resource_->defs) {
+    for (auto& [id, sym] : resource_->sym_defs) {
         auto name = sym->getName();
         if (name.size() < prefix.size()) {
             continue;
@@ -457,7 +489,7 @@ std::vector<glslang::TIntermSymbol*> Doc::lookup_symbols_by_prefix(std::string c
 
 glslang::TIntermSymbol* Doc::lookup_symbol_by_name(std::string const& name)
 {
-    for (auto& [id, sym] : resource_->defs) {
+    for (auto& [id, sym] : resource_->sym_defs) {
         if (name == sym->getName().c_str()) {
             return sym;
         }

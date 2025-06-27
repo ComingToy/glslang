@@ -8,24 +8,12 @@
 #include <vector>
 
 class Doc {
-    struct __Resource {
-        std::string uri;
-        int version;
-        std::string text_;
-        std::vector<std::string> lines_;
-        EShLanguage language;
-        std::unique_ptr<glslang::TShader> shader;
-        std::map<int, std::vector<TIntermNode*>> nodes_by_line;
-        std::map<long long, glslang::TIntermSymbol*> defs;
-        std::vector<glslang::TIntermSymbol*> symbols;
-        int ref = 1;
+public:
+    struct FunctionDefDesc {
+        glslang::TIntermAggregate* def;
+        std::vector<glslang::TIntermSymbol*> args;
     };
 
-    __Resource* resource_;
-    void infer_language_();
-    void release_();
-
-public:
     Doc();
     Doc(std::string const& uri, const int version, std::string const& text);
     Doc(const Doc& rhs);
@@ -44,7 +32,9 @@ public:
     void set_text(std::string const& text);
     void set_uri(std::string const& uri) { resource_->uri = uri; }
     std::vector<glslang::TIntermSymbol*>& symbols() { return resource_->symbols; }
+
     std::vector<glslang::TIntermSymbol*> lookup_symbols_by_prefix(std::string const& prefix);
+
     glslang::TIntermSymbol* lookup_symbol_by_name(std::string const& name);
     glslang::TIntermediate* intermediate() { return resource_->shader->getIntermediate(); }
     const char* info_log() { return resource_->shader->getInfoLog(); }
@@ -59,6 +49,25 @@ public:
 
     std::vector<LookupResult> lookup_nodes_at(const int line, const int col);
     glslang::TSourceLoc locate_symbol_def(glslang::TIntermSymbol* use);
-	static const TBuiltInResource kDefaultTBuiltInResource;
+    static const TBuiltInResource kDefaultTBuiltInResource;
+
+private:
+    struct __Resource {
+        std::string uri;
+        int version;
+        std::string text_;
+        std::vector<std::string> lines_;
+        EShLanguage language;
+        std::unique_ptr<glslang::TShader> shader;
+        std::map<int, std::vector<TIntermNode*>> nodes_by_line;
+        std::map<long long, glslang::TIntermSymbol*> sym_defs;
+        std::vector<glslang::TIntermSymbol*> symbols;
+        std::vector<FunctionDefDesc> func_defs;
+        int ref = 1;
+    };
+
+    __Resource* resource_;
+    void infer_language_();
+    void release_();
 };
 #endif
