@@ -49,10 +49,11 @@ glslang::TSourceLoc Workspace::locate_symbol_def(std::string const& uri, const i
         return {.name = nullptr, .column = 0, .line = 0};
 
     auto nodes = lookup_nodes_at(uri, line, col);
+	auto* func = docs_[uri].lookup_func_by_line(line);
 
     for (auto& node : nodes) {
         if (node.kind == Doc::LookupResult::Kind::SYMBOL) {
-            return docs_[uri].locate_symbol_def(node.sym);
+            return docs_[uri].locate_symbol_def(func, node.sym);
         } else if (node.kind == Doc::LookupResult::Kind::FIELD) {
             return node.field.loc;
         }

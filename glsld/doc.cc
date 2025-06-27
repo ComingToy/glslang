@@ -522,3 +522,13 @@ glslang::TIntermSymbol* Doc::lookup_symbol_by_name(Doc::FunctionDefDesc* func, s
 
     return nullptr;
 }
+
+Doc::FunctionDefDesc* Doc::lookup_func_by_line(int line)
+{
+    for (auto& func : resource_->func_defs) {
+        if (func.start.line <= line && func.end.line >= line) {
+            return &func;
+        }
+    }
+    return nullptr;
+}
