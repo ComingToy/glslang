@@ -12,9 +12,9 @@ public:
     struct FunctionDefDesc {
         glslang::TIntermAggregate* def;
         std::vector<glslang::TIntermSymbol*> args;
-		std::vector<glslang::TIntermSymbol*> local_defs;
-		std::vector<glslang::TIntermSymbol*> local_uses;
-		glslang::TSourceLoc start, end;
+        std::vector<glslang::TIntermSymbol*> local_defs;
+        std::vector<glslang::TIntermSymbol*> local_uses;
+        glslang::TSourceLoc start, end;
     };
 
     Doc();
@@ -34,11 +34,11 @@ public:
     void set_version(const int version) { resource_->version = version; }
     void set_text(std::string const& text);
     void set_uri(std::string const& uri) { resource_->uri = uri; }
-    std::vector<glslang::TIntermSymbol*>& symbols() { return resource_->symbols; }
 
-    std::vector<glslang::TIntermSymbol*> lookup_symbols_by_prefix(std::string const& prefix);
+    std::vector<glslang::TIntermSymbol*> lookup_symbols_by_prefix(Doc::FunctionDefDesc* func,
+                                                                  std::string const& prefix);
 
-    glslang::TIntermSymbol* lookup_symbol_by_name(std::string const& name);
+    glslang::TIntermSymbol* lookup_symbol_by_name(Doc::FunctionDefDesc* func, std::string const& name);
     glslang::TIntermediate* intermediate() { return resource_->shader->getIntermediate(); }
     const char* info_log() { return resource_->shader->getInfoLog(); }
 
@@ -51,7 +51,7 @@ public:
     };
 
     std::vector<LookupResult> lookup_nodes_at(const int line, const int col);
-    glslang::TSourceLoc locate_symbol_def(glslang::TIntermSymbol* use);
+    glslang::TSourceLoc locate_symbol_def(Doc::FunctionDefDesc* func, glslang::TIntermSymbol* use);
     static const TBuiltInResource kDefaultTBuiltInResource;
 
 private:
@@ -64,8 +64,7 @@ private:
         std::unique_ptr<glslang::TShader> shader;
         std::map<int, std::vector<TIntermNode*>> nodes_by_line;
         std::vector<FunctionDefDesc> func_defs;
-		std::vector<glslang::TIntermSymbol*> globals;
-        std::vector<glslang::TIntermSymbol*> uses;
+        std::vector<glslang::TIntermSymbol*> globals;
         int ref = 1;
     };
 

@@ -293,6 +293,7 @@ public:
             body->traverse(&extractor);
             function_def.local_defs.swap(extractor.defs);
             function_def.local_uses.swap(extractor.uses);
+            funcs.emplace_back(std::move(function_def));
             return false;
         }
 
@@ -312,7 +313,6 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     resource_->nodes_by_line.clear();
     resource_->globals.clear();
     resource_->func_defs.clear();
-    resource_->uses.clear();
 
     auto& shader = *resource_->shader;
     std::string preambles;
@@ -376,27 +376,17 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
 
     auto* interm = shader.getIntermediate();
 
-    AllTypesAndSymbolsVisitor_ visitor;
+    DocInfoExtractor visitor;
     interm->getTreeRoot()->traverse(&visitor);
 
-    for (auto& s : visitor.defs) {
+    for (auto& s : visitor.globals) {
         auto loc = s->getLoc();
-        fprintf(stderr, "symbol %s define at %s:%d:%d, type desc: %s\n", s->getName().c_str(), loc.getFilename(),
+        fprintf(stderr, "global symbol %s define at %s:%d:%d, type desc: %s\n", s->getName().c_str(), loc.getFilename(),
                 loc.line, loc.column, s->getType().getCompleteString(true).c_str());
-        resource_->sym_defs[s->getId()] = s;
+        resource_->globals[s->getId()] = s;
     }
-
-    for (auto& s : visitor.symbols) {
-        std::string name = s->getName().c_str();
-        auto loc = s->getLoc();
-        fprintf(stderr, "symbol %s use at %s:%d:%d\n", s->getName().c_str(), loc.getFilename(), loc.line, loc.column);
-        if (resource_->sym_defs.count(s->getId()) > 0) {
-            resource_->symbols.push_back(s);
-        } else {
-            fprintf(stderr, "found symbol %s use but not defined.\n", name.c_str());
-        }
-    }
-
+    resource_->globals.swap(visitor.globals);
+    resource_->func_defs.swap(visitor.funcs);
     resource_->nodes_by_line.swap(visitor.nodes_by_line);
 
     return true;
@@ -462,37 +452,69 @@ std::vector<Doc::LookupResult> Doc::lookup_nodes_at(const int line, const int co
     return result;
 }
 
-glslang::TSourceLoc Doc::locate_symbol_def(glslang::TIntermSymbol* target)
+glslang::TSourceLoc Doc::locate_symbol_def(Doc::FunctionDefDesc* func, glslang::TIntermSymbol* target)
 {
-    if (resource_->sym_defs.count(target->getId())) {
-        auto def = resource_->sym_defs[target->getId()];
-        return def->getLoc();
+    if (func) {
+        for (auto sym : func->local_defs) {
+            if (sym->getId() == target->getId()) {
+                return sym->getLoc();
+            }
+        }
+    }
+
+    for (auto global : resource_->globals) {
+        if (target->getId() == global->getId()) {
+            return global->getLoc();
+        }
     }
 
     return {.name = nullptr, .line = 0, .column = 0};
 }
 
-std::vector<glslang::TIntermSymbol*> Doc::lookup_symbols_by_prefix(std::string const& prefix)
+std::vector<glslang::TIntermSymbol*> Doc::lookup_symbols_by_prefix(Doc::FunctionDefDesc* func,
+                                                                   std::string const& prefix)
 {
     std::vector<glslang::TIntermSymbol*> symbols;
-    for (auto& [id, sym] : resource_->sym_defs) {
-        auto name = sym->getName();
-        if (name.size() < prefix.size()) {
-            continue;
-        }
+    auto match_fn = [&prefix, &symbols](auto vars) {
+        for (auto& sym : vars) {
+            auto name = sym->getName();
+            if (name.size() < prefix.size()) {
+                continue;
+            }
 
-        std::string sub = name.substr(0, prefix.size()).c_str();
-        if (sub == prefix) {
-            symbols.push_back(sym);
+            std::string sub = name.substr(0, prefix.size()).c_str();
+            if (sub == prefix) {
+                symbols.push_back(sym);
+            }
         }
+    };
+
+    match_fn(resource_->globals);
+    if (func) {
+        match_fn(func->args);
+        match_fn(func->local_defs);
     }
 
     return symbols;
 }
 
-glslang::TIntermSymbol* Doc::lookup_symbol_by_name(std::string const& name)
+glslang::TIntermSymbol* Doc::lookup_symbol_by_name(Doc::FunctionDefDesc* func, std::string const& name)
 {
-    for (auto& [id, sym] : resource_->sym_defs) {
+    if (func) {
+        for (auto* def : func->local_defs) {
+            if (name == def->getName().c_str()) {
+                return def;
+            }
+        }
+
+        for (auto* def : func->args) {
+            if (name == def->getName().c_str()) {
+                return def;
+            }
+        }
+    }
+
+    for (auto& sym : resource_->globals) {
         if (name == sym->getName().c_str()) {
             return sym;
         }
