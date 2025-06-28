@@ -107,7 +107,6 @@ struct InputStackState {
     int reduce_n_ = 0;
 };
 
-
 static bool reduce_field_(Doc& doc, std::stack<InputStackState>& input_stack)
 {
     auto field = input_stack.top();
@@ -219,7 +218,7 @@ static bool reduce_arr_(Doc& doc, const int line, const int col, std::stack<Inpu
         return false;
     }
 
-	auto* func = doc.lookup_func_by_line(line);
+    auto* func = doc.lookup_func_by_line(line);
     auto* sym = doc.lookup_symbol_by_name(func, top.stype->lex.string->c_str());
     if (!sym) {
         return false;
@@ -257,7 +256,7 @@ static bool reduce_struct_(Doc& doc, const int line, const int col, std::stack<I
     }
 
     const glslang::TType* type = nullptr;
-	auto* func = doc.lookup_func_by_line(line);
+    auto* func = doc.lookup_func_by_line(line);
     auto* sym = doc.lookup_symbol_by_name(func, top.stype->lex.string->c_str());
     if (sym) {
         type = &sym->getType();
@@ -310,6 +309,24 @@ static void do_complete_var_prefix_(Doc& doc, const int line, const int col, std
         CompletionResult r = {sym->getName().c_str(), CompletionItemKind::Variable,
                               sym->getType().getCompleteString(true, false, false).c_str(), ""};
         results.emplace_back(r);
+    }
+
+    auto match_prefix = [&prefix](std::string const& field) {
+        if (prefix.empty())
+            return true;
+
+        return prefix == field.substr(0, prefix.size());
+    };
+
+    auto& func_defs = doc.func_defs();
+    for (const auto& func : func_defs) {
+        if (!match_prefix(func.def->getName().c_str())) {
+            continue;
+        }
+
+        std::string detail = func.def->getType().getCompleteString(true, false, false).c_str();
+        CompletionResult r = {func.def->getName().c_str(), CompletionItemKind::Function, detail, ""};
+        results.push_back(r);
     }
 }
 

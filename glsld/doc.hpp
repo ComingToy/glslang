@@ -37,7 +37,8 @@ public:
 
     std::vector<glslang::TIntermSymbol*> lookup_symbols_by_prefix(Doc::FunctionDefDesc* func,
                                                                   std::string const& prefix);
-	FunctionDefDesc* lookup_func_by_line(int line);
+    FunctionDefDesc* lookup_func_by_line(int line);
+    std::vector<FunctionDefDesc>& func_defs() { return resource_->func_defs; }
 
     glslang::TIntermSymbol* lookup_symbol_by_name(Doc::FunctionDefDesc* func, std::string const& name);
     glslang::TIntermediate* intermediate() { return resource_->shader->getIntermediate(); }

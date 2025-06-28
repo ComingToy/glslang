@@ -46,7 +46,7 @@ std::vector<Doc::LookupResult> Workspace::lookup_nodes_at(std::string const& uri
 glslang::TSourceLoc Workspace::locate_symbol_def(std::string const& uri, const int line, const int col)
 {
     if (docs_.count(uri) <= 0)
-        return {.name = nullptr, .column = 0, .line = 0};
+        return {.name = nullptr, .line = 0, .column = 0};
 
     auto nodes = lookup_nodes_at(uri, line, col);
     auto* func = docs_[uri].lookup_func_by_line(line);
@@ -59,7 +59,7 @@ glslang::TSourceLoc Workspace::locate_symbol_def(std::string const& uri, const i
         }
     }
 
-    return {.name = nullptr, .column = 0, .line = 0};
+    return {.name = nullptr, .line = 0, .column = 0};
 }
 
 std::string Workspace::get_term(std::string const& uri, const int line, const int col)
