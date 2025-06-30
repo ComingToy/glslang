@@ -5,7 +5,6 @@
 #include "glslang/MachineIndependent/ScanContext.h"
 #include "glslang/MachineIndependent/glslang_tab.cpp.h"
 #include "glslang/MachineIndependent/preprocessor/PpContext.h"
-#include <iostream>
 #include <memory>
 #include <stack>
 #include <tuple>
@@ -319,13 +318,38 @@ static void do_complete_var_prefix_(Doc& doc, const int line, const int col, std
     };
 
     auto& func_defs = doc.func_defs();
+    auto norm_func_name = [](std::string const& fname) {
+        auto pos = fname.find("(");
+        if (pos == std::string::npos) {
+            return fname;
+        }
+
+        return std::string(fname.begin(), fname.begin() + pos);
+    };
+
     for (const auto& func : func_defs) {
         if (!match_prefix(func.def->getName().c_str())) {
             continue;
         }
 
-        std::string detail = func.def->getType().getCompleteString(true, false, false).c_str();
-        CompletionResult r = {func.def->getName().c_str(), CompletionItemKind::Function, detail, ""};
+        auto label = norm_func_name(func.def->getName().c_str());
+        std::string return_type;
+        auto const& rtype = func.def->getType();
+		if (rtype.isStruct()){
+			return_type = rtype.getTypeName();
+		}else{
+			return_type = rtype.getBasicTypeString();
+		}
+
+        std::string args_list;
+        for (auto arg : func.args) {
+            args_list.append(arg->getName().c_str());
+            args_list += ", ";
+        }
+
+        std::string detail = return_type + " " + label + "(" + args_list + ")";
+
+        CompletionResult r = {label, CompletionItemKind::Function, detail, ""};
         results.push_back(r);
     }
 }
