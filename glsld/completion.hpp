@@ -35,6 +35,7 @@ struct CompletionResult {
     CompletionItemKind kind;
     std::string detail;
     std::string documentation;
+	std::string insert_text;
 };
 
 extern std::vector<CompletionResult> completion(Doc& doc, std::string const& input, const int line, const int col);

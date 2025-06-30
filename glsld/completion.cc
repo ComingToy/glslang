@@ -5,6 +5,7 @@
 #include "glslang/MachineIndependent/ScanContext.h"
 #include "glslang/MachineIndependent/glslang_tab.cpp.h"
 #include "glslang/MachineIndependent/preprocessor/PpContext.h"
+#include <cstdio>
 #include <memory>
 #include <stack>
 #include <tuple>
@@ -335,21 +336,42 @@ static void do_complete_var_prefix_(Doc& doc, const int line, const int col, std
         auto label = norm_func_name(func.def->getName().c_str());
         std::string return_type;
         auto const& rtype = func.def->getType();
-		if (rtype.isStruct()){
-			return_type = rtype.getTypeName();
-		}else{
-			return_type = rtype.getBasicTypeString();
-		}
-
-        std::string args_list;
-        for (auto arg : func.args) {
-            args_list.append(arg->getName().c_str());
-            args_list += ", ";
+        if (rtype.isStruct()) {
+            return_type = rtype.getTypeName();
+        } else {
+            return_type = rtype.getBasicTypeString();
         }
 
-        std::string detail = return_type + " " + label + "(" + args_list + ")";
+        std::string args_list_snippet;
+        std::string args_list;
+        for (int i = 0; i < func.args.size(); ++i) {
+            auto* arg = func.args[i];
+            char buf[128];
+            auto const& arg_type = arg->getType();
+            const char* arg_type_str;
+            if (arg_type.isStruct()) {
+                arg_type_str = arg_type.getTypeName().c_str();
+            } else {
+                arg_type_str = arg_type.getBasicTypeString().c_str();
+            }
 
-        CompletionResult r = {label, CompletionItemKind::Function, detail, ""};
+            snprintf(buf, sizeof(buf), "${%d:%s %s}", i + 1, arg_type_str, arg->getName().c_str());
+
+            args_list_snippet += buf;
+            args_list_snippet += ", ";
+            args_list = args_list + arg_type_str + " " + arg->getName().c_str() + ", ";
+        }
+
+        if (args_list_snippet.size() > 2) {
+            args_list_snippet.pop_back();
+            args_list_snippet.pop_back();
+            args_list.pop_back();
+            args_list.pop_back();
+        }
+        std::string detail = return_type + " " + label + "(" + args_list + ")";
+        std::string insert_text = label + "(" + args_list_snippet + ")";
+
+        CompletionResult r = {label, CompletionItemKind::Function, detail, "", insert_text};
         results.push_back(r);
     }
 }
