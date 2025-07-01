@@ -428,8 +428,9 @@ static void do_complete_exp_(Doc& doc, const int line, const int col, std::stack
             auto* func = doc.lookup_func_by_line(line);
             auto symbols = doc.lookup_symbols_by_prefix(func, input.stype->lex.string->c_str());
             for (auto* sym : symbols) {
-                CompletionResult r = {sym->getName().c_str(), CompletionItemKind::Variable,
-                                      sym->getType().getCompleteString(true, false, false).c_str(), ""};
+                std::string label = sym->getName().c_str();
+                std::string detail = sym->getType().getCompleteString(true, false, false).c_str();
+                CompletionResult r = {label, CompletionItemKind::Variable, detail, "", label};
                 results.emplace_back(r);
             }
         } else if (top.tok == DOT) {
@@ -458,7 +459,7 @@ static void do_complete_exp_(Doc& doc, const int line, const int col, std::stack
             auto kind = CompletionItemKind::Field;
             auto detail = field->getCompleteString(true, false, false);
             auto doc = "";
-            results.push_back({label, kind, detail.c_str(), doc});
+            results.push_back({label, kind, detail.c_str(), doc, label});
         }
     }
 }
