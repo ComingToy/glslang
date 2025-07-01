@@ -2443,7 +2443,7 @@ public:
                   appendStr("float");
                   break;
                 default:
-                  appendStr("unexpected");
+				  appendStr(getBasicString());
                   break;
                 }
             }
