@@ -305,9 +305,9 @@ static void do_complete_var_prefix_(Doc& doc, const int line, const int col, std
     auto symbols = doc.lookup_symbols_by_prefix(func, prefix);
     for (auto const& sym : symbols) {
         auto detail = sym->getType().getCompleteString(true, false, false);
+        auto label = sym->getName().c_str();
 
-        CompletionResult r = {sym->getName().c_str(), CompletionItemKind::Variable,
-                              sym->getType().getCompleteString(true, false, false).c_str(), ""};
+        CompletionResult r = {label, CompletionItemKind::Variable, detail.c_str(), "", label};
         results.emplace_back(r);
     }
 
@@ -394,7 +394,7 @@ static void do_complete_struct_field_(const glslang::TType* ttype, std::string c
         auto detail = field->getCompleteString(true, false, false);
         auto doc = "";
         if (match_prefix(label)) {
-            results.push_back({label, kind, detail.c_str(), doc});
+            results.push_back({label, kind, detail.c_str(), doc, label});
         }
     }
 }
