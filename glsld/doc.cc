@@ -2,6 +2,7 @@
 #include "../glslang/MachineIndependent/localintermediate.h"
 #include "StandAlone/DirStackFileIncluder.h"
 #include "glslang/Include/intermediate.h"
+#include "glsld/parser.hpp"
 #include <cstdio>
 #include <iostream>
 #include <map>
@@ -232,7 +233,7 @@ public:
         } else if (loc.line == end_loc.line && loc.column > end_loc.column) {
             end_loc = loc;
         }
-		nodes_by_line[node->getLoc().line].push_back(node);
+        nodes_by_line[node->getLoc().line].push_back(node);
     }
     bool visitBinary(glslang::TVisit, glslang::TIntermBinary* node) override
     {
@@ -243,7 +244,7 @@ public:
             end_loc = loc;
         }
 
-		nodes_by_line[node->getLoc().line].push_back(node);
+        nodes_by_line[node->getLoc().line].push_back(node);
         return true;
     }
     bool visitSelection(glslang::TVisit, glslang::TIntermSelection* node) override
@@ -255,7 +256,7 @@ public:
             end_loc = loc;
         }
 
-		nodes_by_line[node->getLoc().line].push_back(node);
+        nodes_by_line[node->getLoc().line].push_back(node);
         return true;
     }
     bool visitAggregate(glslang::TVisit, glslang::TIntermAggregate* node) override
@@ -267,7 +268,7 @@ public:
             end_loc = loc;
         }
 
-		nodes_by_line[node->getLoc().line].push_back(node);
+        nodes_by_line[node->getLoc().line].push_back(node);
         return true;
     }
     bool visitLoop(glslang::TVisit, glslang::TIntermLoop* node) override
@@ -279,7 +280,7 @@ public:
             end_loc = loc;
         }
 
-		nodes_by_line[node->getLoc().line].push_back(node);
+        nodes_by_line[node->getLoc().line].push_back(node);
         return true;
     }
     bool visitBranch(glslang::TVisit, glslang::TIntermBranch* node) override
@@ -291,7 +292,7 @@ public:
             end_loc = loc;
         }
 
-		nodes_by_line[node->getLoc().line].push_back(node);
+        nodes_by_line[node->getLoc().line].push_back(node);
         return true;
     }
     bool visitSwitch(glslang::TVisit, glslang::TIntermSwitch* node) override
@@ -303,7 +304,7 @@ public:
             end_loc = loc;
         }
 
-		nodes_by_line[node->getLoc().line].push_back(node);
+        nodes_by_line[node->getLoc().line].push_back(node);
         return true;
     }
 
@@ -316,13 +317,13 @@ public:
             end_loc = loc;
         }
 
-		nodes_by_line[symbol->getLoc().line].push_back(symbol);
+        nodes_by_line[symbol->getLoc().line].push_back(symbol);
         uses.push_back(symbol);
     }
     bool visitUnary(glslang::TVisit v, glslang::TIntermUnary* unary) override
     {
         (void)v;
-		nodes_by_line[unary->getLoc().line].push_back(unary);
+        nodes_by_line[unary->getLoc().line].push_back(unary);
         auto loc = unary->getLoc();
         if (loc.line > end_loc.line) {
             end_loc = loc;
@@ -375,14 +376,14 @@ public:
 
             auto& children = agg->getSequence();
             if (children.size() != 2) {
-				std::cerr << "found func " << agg->getName() << " but children size != 2" << std::endl;
+                std::cerr << "found func " << agg->getName() << " but children size != 2" << std::endl;
                 return true;
             }
 
             std::vector<glslang::TIntermSymbol*> args;
             auto* params = children[0]->getAsAggregate();
             if (!params || params->getOp() != glslang::EOpParameters) {
-				std::cerr << "found func " << agg->getName() << " but children[0].op != EOpParameters" << std::endl;
+                std::cerr << "found func " << agg->getName() << " but children[0].op != EOpParameters" << std::endl;
                 return true;
             }
 
@@ -397,16 +398,16 @@ public:
             function_def.local_defs.swap(extractor.defs);
             function_def.local_uses.swap(extractor.uses);
             std::cerr << "found function def " << agg->getName() << " at " << agg->getLoc().getFilename() << ":"
-                      << agg->getLoc().line << ":" << agg->getLoc().column
-					  << " to " << body->getAsAggregate()->getEndLoc().line
+                      << agg->getLoc().line << ":" << agg->getLoc().column << " to "
+                      << body->getAsAggregate()->getEndLoc().line
                       << " return type: " << agg->getType().getCompleteString() << " has " << agg->getSequence().size()
                       << " sub nodes" << std::endl;
 
-			function_def.end = body->getAsAggregate()->getEndLoc();
+            function_def.end = body->getAsAggregate()->getEndLoc();
             funcs.emplace_back(std::move(function_def));
-			for (auto [line, node]: extractor.nodes_by_line){
-				nodes_by_line[line] = node;
-			}
+            for (auto [line, node] : extractor.nodes_by_line) {
+                nodes_by_line[line] = node;
+            }
             return false;
         }
 
@@ -427,7 +428,6 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     resource_->globals.clear();
     resource_->func_defs.clear();
 
-    auto& shader = *resource_->shader;
     std::string preambles;
     // TODO: add macro define
 
@@ -436,61 +436,33 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
 
     auto& shader_strings = resource_->text_;
     const char* shader_source = shader_strings.data();
-    const int shader_lengths = (int)shader_strings.size();
+    size_t shader_lengths = shader_strings.size();
     const char* string_names = resource_->uri.data();
-    shader.setStringsWithLengthsAndNames(&shader_source, &shader_lengths, &string_names, 1);
-    shader.setPreamble(preambles.c_str());
-    shader.setEntryPoint("main");
 
-    bool auto_bind_uniforms_ = false;
-    auto auto_combined_image_sampler_ = false;
-
-    shader.setAutoMapBindings(auto_bind_uniforms_);
-    if (auto_combined_image_sampler_) {
-        shader.setTextureSamplerTransformMode(EShTexSampTransUpgradeTextureRemoveSampler);
-    }
-
-    shader.setShiftImageBinding(0);
-    shader.setShiftSamplerBinding(0);
-    shader.setShiftTextureBinding(0);
-    shader.setShiftUboBinding(0);
-    shader.setShiftSsboBinding(0);
-    shader.setShiftUavBinding(0);
-
-    shader.setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_3);
-    shader.setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_3);
-    glslang::EShSource language = glslang::EShSourceGlsl;
-    // This option will only be used if the Vulkan client is used.
-    // If new versions of GL_KHR_vulkan_glsl come out, it would make sense to
-    // let callers specify which version to use. For now, just use 100.
-    shader.setEnvInput(language, EShLangCompute, glslang::EShClientVulkan, 100);
-    shader.setEnvInputVulkanRulesRelaxed();
-    shader.setInvertY(false);
-    shader.setNanMinMaxClamp(false);
-
-    DirStackFileIncluder includer;
-    for (auto& d : include_dirs) {
-        includer.pushExternalLocalDirectory(d);
-    }
-
-    const EShMessages rules = static_cast<EShMessages>(EShMsgCascadingErrors | EShMsgSpvRules | EShMsgVulkanRules);
+    glslang::TInputScanner userInput(1, &shader_source, &shader_lengths);
 
     auto default_version_ = 110;
     auto default_profile_ = ENoProfile;
-    auto force_version_profile_ = false;
+    glslang::SpvVersion spv;
+    spv.spv = glslang::EShTargetSpv_1_0;
+    spv.vulkan = glslang::EShTargetVulkan_1_0;
 
-    bool success = false;
+    auto parser_resource = create_parser(default_version_, default_profile_, EShLangCompute, spv, "main");
 
-    success = shader.parse(&kDefaultTBuiltInResource, default_version_, default_profile_, force_version_profile_, false,
-                           rules, includer);
+    for (auto& d : include_dirs) {
+        parser_resource->includer->pushExternalLocalDirectory(d);
+    }
+
+    parser_resource->ppcontext->setInput(userInput, false);
+    parser_resource->parse_context->setScanner(&userInput);
+
+    bool success = parser_resource->parse_context->parseShaderStrings(*parser_resource->ppcontext, userInput);
     if (!success) {
         return false;
     }
 
-    auto* interm = shader.getIntermediate();
-
     DocInfoExtractor visitor;
-    interm->getTreeRoot()->traverse(&visitor);
+    parser_resource->intermediate->getTreeRoot()->traverse(&visitor);
 
     for (auto& s : visitor.globals) {
         auto loc = s->getLoc();
@@ -499,7 +471,7 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
         resource_->globals.push_back(s);
     }
 
-	std::cerr << "DocInfoExtractor found " << visitor.funcs.size() << " function def" << std::endl;
+    std::cerr << "DocInfoExtractor found " << visitor.funcs.size() << " function def" << std::endl;
     resource_->globals.swap(visitor.globals);
     resource_->func_defs.swap(visitor.funcs);
     resource_->nodes_by_line.swap(visitor.nodes_by_line);
