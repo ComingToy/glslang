@@ -2,6 +2,7 @@
 #include "../glslang/MachineIndependent/localintermediate.h"
 #include "StandAlone/DirStackFileIncluder.h"
 #include "glslang/Include/intermediate.h"
+#include "glsld/parser.hpp"
 #include <cstdio>
 #include <iostream>
 #include <map>
@@ -11,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+extern int yylex(YYSTYPE*, glslang::TParseContext&);
 const TBuiltInResource Doc::kDefaultTBuiltInResource = {
     /*.maxLights = */ 8,        // From OpenGL 3.0 table 6.46.
     /*.maxClipPlanes = */ 6,    // From OpenGL 3.0 table 6.46.
@@ -156,6 +158,7 @@ Doc::Doc(std::string const& uri, const int version, std::string const& text)
     set_text(text);
     infer_language_();
     resource_->shader = nullptr;
+    resource_->parser = nullptr;
 }
 
 void Doc::set_text(std::string const& text)
@@ -522,9 +525,43 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     resource_->globals.swap(visitor.globals);
     resource_->func_defs.swap(visitor.funcs);
     resource_->nodes_by_line.swap(visitor.nodes_by_line);
-	resource_->userdef_types.swap(visitor.userdef_types);
+    resource_->userdef_types.swap(visitor.userdef_types);
+	tokenize_();
 
     return true;
+}
+
+void Doc::tokenize_()
+{
+    // tokenize
+    if (!resource_->shader) {
+        return;
+    }
+    auto* interm = resource_->shader->getIntermediate();
+    if (!interm)
+        return;
+
+    resource_->parser = create_parser(interm->getVersion(), interm->getProfile(), interm->getStage(), interm->getSpv(),
+                                      interm->getEntryPointName().c_str());
+
+    auto* parser = resource_->parser.get();
+    size_t len = resource_->text_.size();
+    const char* shader_source = resource_->text_.data();
+    glslang::TInputScanner scanner(1, &shader_source, &len);
+
+    parser->ppcontext->setInput(scanner, false);
+    parser->parse_context->setScanner(&scanner);
+
+    while (true) {
+        YYSTYPE stype;
+        int tok = yylex(&stype, *parser->parse_context);
+        if (!tok) {
+            break;
+        }
+
+        auto line = stype.lex.loc.line;
+        resource_->tokens_by_line[line].push_back({tok, stype.lex});
+    }
 }
 
 static Doc::LookupResult lookup_binop(glslang::TIntermBinary* binary, const int line, const int col)

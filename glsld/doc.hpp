@@ -2,9 +2,11 @@
 #define __GLSLD_DOC_HPP__
 #include "../glslang/MachineIndependent/localintermediate.h"
 #include "../glslang/Public/ShaderLang.h"
+#include "parser.hpp"
 #include <map>
 #include <memory>
 #include <string>
+#include <tuple>
 #include <vector>
 
 class Doc {
@@ -58,6 +60,12 @@ public:
     static const TBuiltInResource kDefaultTBuiltInResource;
 
 private:
+    typedef decltype(YYSTYPE::lex) lex_info_type;
+	struct Token
+	{
+		int tok;
+		lex_info_type lex;
+	};
     struct __Resource {
         std::string uri;
         int version;
@@ -69,11 +77,14 @@ private:
         std::vector<FunctionDefDesc> func_defs;
         std::vector<glslang::TIntermSymbol*> globals;
         std::vector<glslang::TIntermSymbol*> userdef_types;
+        std::map<int, std::vector<Token>> tokens_by_line;
+        std::unique_ptr<ParserResouce> parser;
         int ref = 1;
     };
 
     __Resource* resource_;
     void infer_language_();
+	void tokenize_();
     void release_();
 };
 #endif
