@@ -206,6 +206,30 @@ static bool reduce_struct_(Doc& doc, const int line, const int col, std::stack<I
     return true;
 }
 
+static bool match_prefix(std::string const& s, std::string const& prefix)
+{
+    if (prefix.empty())
+        return true;
+
+    return prefix == s.substr(0, prefix.size());
+}
+
+static void do_complete_type_prefix_(Doc& doc, std::string const& prefix, std::vector<CompletionResult>& results)
+{
+    auto const& userdef_types = doc.userdef_types();
+    for (auto* sym : userdef_types) {
+        auto loc = sym->getLoc();
+        auto const& ty = sym->getType();
+        auto const* tyname = ty.getTypeName().c_str();
+        if (!match_prefix(tyname, prefix))
+            continue;
+
+        CompletionResult r = {tyname, CompletionItemKind::Struct, ty.getCompleteString(true, false, false).c_str(), "",
+                              tyname, InsertTextFormat::PlainText};
+        results.push_back(r);
+    }
+}
+
 static void do_complete_var_prefix_(Doc& doc, const int line, const int col, std::string const& prefix,
                                     std::vector<CompletionResult>& results)
 {
@@ -327,6 +351,7 @@ static void do_complete_exp_(Doc& doc, const int line, const int col, std::stack
                     do_complete_struct_field_(&anon->getType(), prefix, results);
                 }
             }
+			do_complete_type_prefix_(doc, prefix, results);
             return;
         }
 

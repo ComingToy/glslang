@@ -7,25 +7,23 @@
 #include <memory>
 
 struct ParserResouce {
-    std::unique_ptr<glslang::TSymbolTable> symbol_table;
-    std::unique_ptr<glslang::TIntermediate> intermediate;
-    std::unique_ptr<glslang::TParseContext> parse_context;
-    std::unique_ptr<glslang::TScanContext> scan_context;
-    std::unique_ptr<glslang::TPpContext> ppcontext;
-    std::unique_ptr<DirStackFileIncluder> includer;
+    glslang::TSymbolTable* symbol_table;
+    glslang::TIntermediate* intermediate;
+    glslang::TParseContext* parse_context;
+    glslang::TScanContext* scan_context;
+    glslang::TPpContext* ppcontext;
+    DirStackFileIncluder* includer;
 
-    ParserResouce(std::unique_ptr<glslang::TSymbolTable>&& symbol_table,
-                  std::unique_ptr<glslang::TIntermediate>&& intermediate,
-                  std::unique_ptr<glslang::TParseContext>&& parse_context,
-                  std::unique_ptr<glslang::TScanContext>&& scan_context,
-                  std::unique_ptr<glslang::TPpContext>&& ppcontext, std::unique_ptr<DirStackFileIncluder>&& includer)
+    ParserResouce(glslang::TSymbolTable* symbol_table, glslang::TIntermediate* intermediate,
+                  glslang::TParseContext* parse_context, glslang::TScanContext* scan_context,
+                  glslang::TPpContext* ppcontext, DirStackFileIncluder* includer)
     {
-        this->symbol_table = std::move(symbol_table);
-        this->intermediate = std::move(intermediate);
-        this->parse_context = std::move(parse_context);
-        this->scan_context = std::move(scan_context);
-        this->ppcontext = std::move(ppcontext);
-        this->includer = std::move(includer);
+        this->symbol_table = symbol_table;
+        this->intermediate = intermediate;
+        this->parse_context = parse_context;
+        this->scan_context = scan_context;
+        this->ppcontext = ppcontext;
+        this->includer = includer;
     }
 };
 

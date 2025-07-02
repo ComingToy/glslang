@@ -39,6 +39,7 @@ public:
                                                                   std::string const& prefix);
     FunctionDefDesc* lookup_func_by_line(int line);
     std::vector<FunctionDefDesc>& func_defs() { return resource_->func_defs; }
+    std::vector<glslang::TIntermSymbol*>& userdef_types() { return resource_->userdef_types; }
 
     glslang::TIntermSymbol* lookup_symbol_by_name(Doc::FunctionDefDesc* func, std::string const& name);
     glslang::TIntermediate* intermediate() { return resource_->shader->getIntermediate(); }

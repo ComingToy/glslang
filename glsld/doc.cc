@@ -522,6 +522,7 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     resource_->globals.swap(visitor.globals);
     resource_->func_defs.swap(visitor.funcs);
     resource_->nodes_by_line.swap(visitor.nodes_by_line);
+	resource_->userdef_types.swap(visitor.userdef_types);
 
     return true;
 }

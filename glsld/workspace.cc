@@ -62,7 +62,7 @@ glslang::TSourceLoc Workspace::locate_symbol_def(std::string const& uri, const i
     return {.name = nullptr, .line = 0, .column = 0};
 }
 
-std::string Workspace::get_term(std::string const& uri, const int line, const int col)
+std::string Workspace::get_sentence(std::string const& uri, const int line, const int col)
 {
     if (docs_.count(uri) <= 0)
         return "";

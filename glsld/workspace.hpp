@@ -28,6 +28,6 @@ public:
                                                   std::string const& name);
     std::vector<glslang::TIntermSymbol*> lookup_symbols_by_prefix(std::string const& uri, Doc::FunctionDefDesc* func,
                                                                   std::string const& prefix);
-    std::string get_term(std::string const& uri, const int line, const int col);
+    std::string get_sentence(std::string const& uri, const int line, const int col);
 };
 #endif
