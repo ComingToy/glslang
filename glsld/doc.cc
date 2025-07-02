@@ -431,16 +431,6 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     std::string preambles;
     // TODO: add macro define
 
-    const std::string pound_extension = "#extension GL_GOOGLE_include_directive : enable\n";
-    preambles += pound_extension;
-
-    auto& shader_strings = resource_->text_;
-    const char* shader_source = shader_strings.data();
-    size_t shader_lengths = shader_strings.size();
-    const char* string_names = resource_->uri.data();
-
-    glslang::TInputScanner userInput(1, &shader_source, &shader_lengths);
-
     auto default_version_ = 110;
     auto default_profile_ = ENoProfile;
     glslang::SpvVersion spv;
@@ -453,8 +443,22 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
         parser_resource->includer->pushExternalLocalDirectory(d);
     }
 
-    parser_resource->ppcontext->setInput(userInput, false);
+    // parser_resource->ppcontext->setInput(userInput, false);
+    const std::string pound_extension = "#extension GL_GOOGLE_include_directive : enable\n";
+    preambles += pound_extension;
+
+    std::string appendPreambles;
+    parser_resource->parse_context->getPreamble(appendPreambles);
+
+    auto shader_strings = preambles + resource_->text_;
+    const char* shader_source = shader_strings.data();
+    size_t shader_lengths = shader_strings.size();
+    const char* string_names = resource_->uri.data();
+
+    glslang::TInputScanner userInput(1, &shader_source, &shader_lengths);
+
     parser_resource->parse_context->setScanner(&userInput);
+    parser_resource->parse_context->initializeExtensionBehavior();
 
     bool success = parser_resource->parse_context->parseShaderStrings(*parser_resource->ppcontext, userInput);
     if (!success) {

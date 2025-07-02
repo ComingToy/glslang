@@ -7,26 +7,22 @@
 #include <memory>
 
 struct ParserResouce {
-    std::unique_ptr<glslang::TSymbolTable> symbol_table;
-    std::unique_ptr<glslang::TIntermediate> intermediate;
-    std::unique_ptr<glslang::TParseContext> parse_context;
-    std::unique_ptr<glslang::TScanContext> scan_context;
-    std::unique_ptr<glslang::TPpContext> ppcontext;
-    std::unique_ptr<DirStackFileIncluder> includer;
+    glslang::TSymbolTable* symbol_table;
+    glslang::TIntermediate* intermediate;
+    glslang::TParseContext* parse_context;
+    glslang::TScanContext* scan_context;
+    glslang::TPpContext* ppcontext;
+    DirStackFileIncluder* includer;
 
-    ParserResouce(std::unique_ptr<glslang::TSymbolTable>&& symbol_table,
-                  std::unique_ptr<glslang::TIntermediate>&& intermediate,
-                  std::unique_ptr<glslang::TParseContext>&& parse_context,
-                  std::unique_ptr<glslang::TScanContext>&& scan_context,
-                  std::unique_ptr<glslang::TPpContext>&& ppcontext, std::unique_ptr<DirStackFileIncluder>&& includer)
-    {
-        this->symbol_table = std::move(symbol_table);
-        this->intermediate = std::move(intermediate);
-        this->parse_context = std::move(parse_context);
-        this->scan_context = std::move(scan_context);
-        this->ppcontext = std::move(ppcontext);
-        this->includer = std::move(includer);
-    }
+	~ParserResouce()
+	{
+		delete parse_context;
+		delete ppcontext;
+		delete scan_context;
+		delete intermediate;
+		delete symbol_table;
+		delete includer;
+	}
 };
 
 extern std::unique_ptr<ParserResouce> create_parser(const int version, EProfile profile, EShLanguage stage,

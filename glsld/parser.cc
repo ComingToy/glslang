@@ -1,5 +1,6 @@
 #include "parser.hpp"
 #include "glslang/MachineIndependent/Initialize.h"
+#include <memory>
 static glslang::TParseContext* CreateParseContext(glslang::TSymbolTable& symbolTable,
                                                   glslang::TIntermediate& intermediate, int version, EProfile profile,
                                                   glslang::EShSource source, EShLanguage language, TInfoSink& infoSink,
@@ -221,30 +222,26 @@ std::unique_ptr<ParserResouce> create_parser(const int version, EProfile profile
             /*.generalConstantMatrixVectorIndexing = */ 1,
         }};
 
-    std::unique_ptr<glslang::TSymbolTable> symbolTable(new glslang::TSymbolTable);
+    auto* symbolTable(new glslang::TSymbolTable);
     TInfoSink infoSink;
     AddContextSpecificSymbols(&kDefaultTBuiltInResource, infoSink, *symbolTable, version, profile, spvVersion, stage,
                               glslang::EShSourceGlsl);
 
-    auto intermediate = std::make_unique<glslang::TIntermediate>(stage);
+    auto* intermediate = new glslang::TIntermediate(stage);
     const EShMessages message = static_cast<EShMessages>(EShMsgCascadingErrors | EShMsgSpvRules | EShMsgVulkanRules);
 
-    std::unique_ptr<glslang::TParseContext> parseContext(
-        CreateParseContext(*symbolTable, *intermediate, version, profile, glslang::EShSourceGlsl, stage, infoSink,
-                           spvVersion, false, message, false, entrypoint));
+    auto* parseContext(CreateParseContext(*symbolTable, *intermediate, version, profile, glslang::EShSourceGlsl, stage,
+                                          infoSink, spvVersion, false, message, false, entrypoint));
     parseContext->compileOnly = false;
 
-    std::unique_ptr<glslang::TScanContext> scanContext(new glslang::TScanContext(*parseContext));
-    parseContext->setScanContext(scanContext.get());
+    auto* scanContext(new glslang::TScanContext(*parseContext));
+    parseContext->setScanContext(scanContext);
 
-    auto includer = std::make_unique<DirStackFileIncluder>();
+    auto includer = new DirStackFileIncluder();
 
-    std::unique_ptr<glslang::TPpContext> ppContext(new glslang::TPpContext(*parseContext, "", *includer));
-    parseContext->setPpContext(ppContext.get());
+    auto* ppContext(new glslang::TPpContext(*parseContext, "", *includer));
+    parseContext->setPpContext(ppContext);
 
-    auto resource =
-        std::make_unique<ParserResouce>(std::move(symbolTable), std::move(intermediate), std::move(parseContext),
-                                        std::move(scanContext), std::move(ppContext), std::move(includer));
-
-    return resource;
+    auto* p = new ParserResouce{symbolTable, intermediate, parseContext, scanContext, ppContext, includer};
+    return std::unique_ptr<ParserResouce>(p);
 }
