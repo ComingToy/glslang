@@ -345,6 +345,7 @@ public:
     std::vector<glslang::TIntermSymbol*> uses;
     std::vector<glslang::TIntermSymbol*> globals;
     std::vector<Doc::FunctionDefDesc> funcs;
+    std::vector<glslang::TIntermSymbol*> userdef_types;
     bool visitBinary(glslang::TVisit, glslang::TIntermBinary* node) override
     {
         if (node->getOp() == glslang::EOpIndexDirectStruct || node->getOp() == glslang::EOpIndexDirect ||
@@ -418,10 +419,8 @@ public:
     {
         if (unary->getOp() == glslang::EOpDeclareType) {
             auto* sym = unary->getOperand()->getAsSymbolNode();
-            const auto& type = sym->getType();
-            auto loc = sym->getLoc();
-            std::cerr << "found user def type " << type.getTypeName() << " at " << loc.getFilename() << ":" << loc.line
-                      << ":" << loc.column << std::endl;
+            if (sym)
+                userdef_types.push_back(sym);
             return false;
         }
 
@@ -438,6 +437,7 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     resource_->nodes_by_line.clear();
     resource_->globals.clear();
     resource_->func_defs.clear();
+    resource_->userdef_types.clear();
 
     auto& shader = *resource_->shader;
     std::string preambles;
@@ -509,6 +509,13 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
         fprintf(stderr, "global symbol %s define at %s:%d:%d\n", s->getName().c_str(), loc.getFilename(), loc.line,
                 loc.column);
         resource_->globals.push_back(s);
+    }
+
+    for (auto& t : visitor.userdef_types) {
+        auto loc = t->getLoc();
+        auto const& type = t->getType();
+        fprintf(stderr, "user def type %s: %s define at %s:%d:%d\n", type.getTypeName().c_str(),
+                type.getCompleteString(true, false, false).c_str(), loc.getFilename(), loc.line, loc.column);
     }
 
     std::cerr << "DocInfoExtractor found " << visitor.funcs.size() << " function def" << std::endl;

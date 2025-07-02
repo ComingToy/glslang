@@ -67,6 +67,7 @@ private:
         std::map<int, std::vector<TIntermNode*>> nodes_by_line;
         std::vector<FunctionDefDesc> func_defs;
         std::vector<glslang::TIntermSymbol*> globals;
+        std::vector<glslang::TIntermSymbol*> userdef_types;
         int ref = 1;
     };
 
