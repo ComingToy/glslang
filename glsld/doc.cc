@@ -232,7 +232,7 @@ public:
         } else if (loc.line == end_loc.line && loc.column > end_loc.column) {
             end_loc = loc;
         }
-		nodes_by_line[node->getLoc().line].push_back(node);
+        nodes_by_line[node->getLoc().line].push_back(node);
     }
     bool visitBinary(glslang::TVisit, glslang::TIntermBinary* node) override
     {
@@ -243,7 +243,7 @@ public:
             end_loc = loc;
         }
 
-		nodes_by_line[node->getLoc().line].push_back(node);
+        nodes_by_line[node->getLoc().line].push_back(node);
         return true;
     }
     bool visitSelection(glslang::TVisit, glslang::TIntermSelection* node) override
@@ -255,7 +255,7 @@ public:
             end_loc = loc;
         }
 
-		nodes_by_line[node->getLoc().line].push_back(node);
+        nodes_by_line[node->getLoc().line].push_back(node);
         return true;
     }
     bool visitAggregate(glslang::TVisit, glslang::TIntermAggregate* node) override
@@ -267,7 +267,7 @@ public:
             end_loc = loc;
         }
 
-		nodes_by_line[node->getLoc().line].push_back(node);
+        nodes_by_line[node->getLoc().line].push_back(node);
         return true;
     }
     bool visitLoop(glslang::TVisit, glslang::TIntermLoop* node) override
@@ -279,7 +279,7 @@ public:
             end_loc = loc;
         }
 
-		nodes_by_line[node->getLoc().line].push_back(node);
+        nodes_by_line[node->getLoc().line].push_back(node);
         return true;
     }
     bool visitBranch(glslang::TVisit, glslang::TIntermBranch* node) override
@@ -291,7 +291,7 @@ public:
             end_loc = loc;
         }
 
-		nodes_by_line[node->getLoc().line].push_back(node);
+        nodes_by_line[node->getLoc().line].push_back(node);
         return true;
     }
     bool visitSwitch(glslang::TVisit, glslang::TIntermSwitch* node) override
@@ -303,7 +303,7 @@ public:
             end_loc = loc;
         }
 
-		nodes_by_line[node->getLoc().line].push_back(node);
+        nodes_by_line[node->getLoc().line].push_back(node);
         return true;
     }
 
@@ -316,13 +316,13 @@ public:
             end_loc = loc;
         }
 
-		nodes_by_line[symbol->getLoc().line].push_back(symbol);
+        nodes_by_line[symbol->getLoc().line].push_back(symbol);
         uses.push_back(symbol);
     }
     bool visitUnary(glslang::TVisit v, glslang::TIntermUnary* unary) override
     {
         (void)v;
-		nodes_by_line[unary->getLoc().line].push_back(unary);
+        nodes_by_line[unary->getLoc().line].push_back(unary);
         auto loc = unary->getLoc();
         if (loc.line > end_loc.line) {
             end_loc = loc;
@@ -375,14 +375,14 @@ public:
 
             auto& children = agg->getSequence();
             if (children.size() != 2) {
-				std::cerr << "found func " << agg->getName() << " but children size != 2" << std::endl;
+                std::cerr << "found func " << agg->getName() << " but children size != 2" << std::endl;
                 return true;
             }
 
             std::vector<glslang::TIntermSymbol*> args;
             auto* params = children[0]->getAsAggregate();
             if (!params || params->getOp() != glslang::EOpParameters) {
-				std::cerr << "found func " << agg->getName() << " but children[0].op != EOpParameters" << std::endl;
+                std::cerr << "found func " << agg->getName() << " but children[0].op != EOpParameters" << std::endl;
                 return true;
             }
 
@@ -397,16 +397,16 @@ public:
             function_def.local_defs.swap(extractor.defs);
             function_def.local_uses.swap(extractor.uses);
             std::cerr << "found function def " << agg->getName() << " at " << agg->getLoc().getFilename() << ":"
-                      << agg->getLoc().line << ":" << agg->getLoc().column
-					  << " to " << body->getAsAggregate()->getEndLoc().line
+                      << agg->getLoc().line << ":" << agg->getLoc().column << " to "
+                      << body->getAsAggregate()->getEndLoc().line
                       << " return type: " << agg->getType().getCompleteString() << " has " << agg->getSequence().size()
                       << " sub nodes" << std::endl;
 
-			function_def.end = body->getAsAggregate()->getEndLoc();
+            function_def.end = body->getAsAggregate()->getEndLoc();
             funcs.emplace_back(std::move(function_def));
-			for (auto [line, node]: extractor.nodes_by_line){
-				nodes_by_line[line] = node;
-			}
+            for (auto [line, node] : extractor.nodes_by_line) {
+                nodes_by_line[line] = node;
+            }
             return false;
         }
 
@@ -414,7 +414,19 @@ public:
     }
 
     void visitConstantUnion(glslang::TIntermConstantUnion* node) override {}
-    bool visitUnary(glslang::TVisit v, glslang::TIntermUnary* unary) override {}
+    bool visitUnary(glslang::TVisit v, glslang::TIntermUnary* unary) override
+    {
+        if (unary->getOp() == glslang::EOpDeclareType) {
+            auto* sym = unary->getOperand()->getAsSymbolNode();
+            const auto& type = sym->getType();
+            auto loc = sym->getLoc();
+            std::cerr << "found user def type " << type.getTypeName() << " at " << loc.getFilename() << ":" << loc.line
+                      << ":" << loc.column << std::endl;
+            return false;
+        }
+
+        return true;
+    }
 };
 
 bool Doc::parse(std::vector<std::string> const& include_dirs)
@@ -499,7 +511,7 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
         resource_->globals.push_back(s);
     }
 
-	std::cerr << "DocInfoExtractor found " << visitor.funcs.size() << " function def" << std::endl;
+    std::cerr << "DocInfoExtractor found " << visitor.funcs.size() << " function def" << std::endl;
     resource_->globals.swap(visitor.globals);
     resource_->func_defs.swap(visitor.funcs);
     resource_->nodes_by_line.swap(visitor.nodes_by_line);

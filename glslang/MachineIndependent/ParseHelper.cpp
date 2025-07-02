@@ -7963,24 +7963,34 @@ TIntermTyped* TParseContext::vkRelaxedRemapFunctionCall(const TSourceLoc& loc, T
 
 // When a declaration includes a type, but not a variable name, it can be used
 // to establish defaults.
-void TParseContext::declareTypeDefaults(const TSourceLoc& loc, const TPublicType& publicType)
+TIntermNode* TParseContext::declareTypeDefaults(const TSourceLoc& loc, const TPublicType& publicType)
 {
+	TIntermNode* node = nullptr;
+	
     if (publicType.basicType == EbtAtomicUint && publicType.qualifier.hasBinding()) {
         if (publicType.qualifier.layoutBinding >= (unsigned int)resources.maxAtomicCounterBindings) {
             error(loc, "atomic_uint binding is too large", "binding", "");
-            return;
+            return node;
         }
         if (publicType.qualifier.hasOffset())
             atomicUintOffsets[publicType.qualifier.layoutBinding] = publicType.qualifier.layoutOffset;
-        return;
+        return node;
     }
 
     if (publicType.arraySizes) {
         error(loc, "expect an array name", "", "");
     }
 
-    if (publicType.qualifier.hasLayout() && !publicType.qualifier.hasBufferReference())
+    if (publicType.qualifier.hasLayout() && !publicType.qualifier.hasBufferReference()){
         warn(loc, "useless application of layout qualifier", "layout", "");
+	}
+
+	if (publicType.userDef)
+	{
+		auto sym = intermediate.addSymbol(*publicType.userDef, loc);
+		node = intermediate.addUnaryNode(EOpDeclareType, sym, loc);
+	}
+	return node;
 }
 
 void TParseContext::typeParametersCheck(const TSourceLoc& loc, const TPublicType& publicType)

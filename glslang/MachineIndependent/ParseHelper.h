@@ -445,7 +445,7 @@ public:
     const TFunction* findFunction120(const TSourceLoc& loc, const TFunction& call, bool& builtIn);
     const TFunction* findFunction400(const TSourceLoc& loc, const TFunction& call, bool& builtIn);
     const TFunction* findFunctionExplicitTypes(const TSourceLoc& loc, const TFunction& call, bool& builtIn);
-    void declareTypeDefaults(const TSourceLoc&, const TPublicType&);
+    TIntermNode* declareTypeDefaults(const TSourceLoc&, const TPublicType&);
     TIntermNode* declareVariable(const TSourceLoc&, TString& identifier, const TPublicType&, TArraySizes* typeArray = nullptr, TIntermTyped* initializer = nullptr);
     TIntermTyped* addConstructor(const TSourceLoc&, TIntermNode*, const TType&);
     TIntermTyped* constructAggregate(TIntermNode*, const TType&, int, const TSourceLoc&);
