@@ -279,7 +279,7 @@ static void do_complete_var_prefix_(Doc& doc, const int line, const int col, std
         std::string detail = return_type + " " + label + "(" + args_list + ")";
         std::string insert_text = label + "(" + args_list_snippet + ")";
 
-        CompletionResult r = {label, CompletionItemKind::Function, detail, "", insert_text};
+        CompletionResult r = {label, CompletionItemKind::Function, detail, "", insert_text, InsertTextFormat::Snippet};
         results.push_back(r);
     }
 }
@@ -302,7 +302,7 @@ static void do_complete_struct_field_(const glslang::TType* ttype, std::string c
         auto detail = field->getCompleteString(true, false, false);
         auto doc = "";
         if (match_prefix(label)) {
-            results.push_back({label, kind, detail.c_str(), doc, label});
+            results.push_back({label, kind, detail.c_str(), doc, label, InsertTextFormat::PlainText});
         }
     }
 }
@@ -367,7 +367,7 @@ static void do_complete_exp_(Doc& doc, const int line, const int col, std::stack
             auto kind = CompletionItemKind::Field;
             auto detail = field->getCompleteString(true, false, false);
             auto doc = "";
-            results.push_back({label, kind, detail.c_str(), doc, label});
+            results.push_back({label, kind, detail.c_str(), doc, label, InsertTextFormat::PlainText});
         }
     }
 }

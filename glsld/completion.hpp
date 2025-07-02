@@ -30,12 +30,30 @@ enum class CompletionItemKind {
     TypeParameter = 25,
 };
 
+enum class InsertTextFormat {
+    /**
+	 * The primary text to be inserted is treated as a plain string.
+	 */
+    PlainText = 1,
+
+    /**
+	 * The primary text to be inserted is treated as a snippet.
+	 *
+	 * A snippet can define tab stops and placeholders with `$1`, `$2`
+	 * and `${3:foo}`. `$0` defines the final tab stop, it defaults to
+	 * the end of the snippet. Placeholders with equal identifiers are linked,
+	 * that is typing in one will update others too.
+	 */
+    Snippet = 2
+};
+
 struct CompletionResult {
     std::string label;
     CompletionItemKind kind;
     std::string detail;
     std::string documentation;
-	std::string insert_text;
+    std::string insert_text;
+	InsertTextFormat insert_text_format;
 };
 
 extern std::vector<CompletionResult> completion(Doc& doc, std::string const& input, const int line, const int col);

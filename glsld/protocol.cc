@@ -179,8 +179,8 @@ void Protocol::completion_(nlohmann::json& req)
         item["kind"] = int(result.kind);
         item["detail"] = result.detail;
         item["documentation"] = result.documentation;
-		item["insertText"] = result.insert_text;
-		item["insertTextFormat"] = 2;
+        item["insertText"] = result.insert_text;
+        item["insertTextFormat"] = int(result.insert_text_format);
         completion_items.push_back(item);
     }
 
