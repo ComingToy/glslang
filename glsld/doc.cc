@@ -158,7 +158,6 @@ Doc::Doc(std::string const& uri, const int version, std::string const& text)
     set_text(text);
     infer_language_();
     resource_->shader = nullptr;
-    resource_->parser = nullptr;
 }
 
 void Doc::set_text(std::string const& text)
@@ -526,7 +525,7 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     resource_->func_defs.swap(visitor.funcs);
     resource_->nodes_by_line.swap(visitor.nodes_by_line);
     resource_->userdef_types.swap(visitor.userdef_types);
-	tokenize_();
+    tokenize_();
 
     return true;
 }
@@ -534,17 +533,11 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
 void Doc::tokenize_()
 {
     // tokenize
-    if (!resource_->shader) {
-        return;
-    }
-    auto* interm = resource_->shader->getIntermediate();
-    if (!interm)
-        return;
+    auto default_version_ = 110;
+    auto default_profile_ = ENoProfile;
+    auto default_spv = glslang::SpvVersion();
+    auto parser = create_parser(default_version_, default_profile_, language(), default_spv, "main");
 
-    resource_->parser = create_parser(interm->getVersion(), interm->getProfile(), interm->getStage(), interm->getSpv(),
-                                      interm->getEntryPointName().c_str());
-
-    auto* parser = resource_->parser.get();
     size_t len = resource_->text_.size();
     const char* shader_source = resource_->text_.data();
     glslang::TInputScanner scanner(1, &shader_source, &len);

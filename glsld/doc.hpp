@@ -28,6 +28,14 @@ public:
     virtual ~Doc();
 
     bool parse(std::vector<std::string> const& include_dirs);
+    void update(const int version, std::string const& text)
+    {
+        if (resource_->version >= version)
+            return;
+        resource_->version = version;
+        set_text(text);
+        tokenize_();
+    }
 
     int version() const { return resource_->version; }
     std::vector<std::string> const& lines() const { return resource_->lines_; }
@@ -61,11 +69,10 @@ public:
 
 private:
     typedef decltype(YYSTYPE::lex) lex_info_type;
-	struct Token
-	{
-		int tok;
-		lex_info_type lex;
-	};
+    struct Token {
+        int tok;
+        lex_info_type lex;
+    };
     struct __Resource {
         std::string uri;
         int version;
@@ -78,13 +85,12 @@ private:
         std::vector<glslang::TIntermSymbol*> globals;
         std::vector<glslang::TIntermSymbol*> userdef_types;
         std::map<int, std::vector<Token>> tokens_by_line;
-        std::unique_ptr<ParserResouce> parser;
         int ref = 1;
     };
 
     __Resource* resource_;
     void infer_language_();
-	void tokenize_();
+    void tokenize_();
     void release_();
 };
 #endif

@@ -11,11 +11,7 @@ std::string const& Workspace::get_root() const { return root_; }
 void Workspace::update_doc(std::string const& uri, const int version, std::string const& text)
 {
     if (docs_.count(uri) > 0) {
-        if (docs_[uri].version() < version) {
-            docs_[uri].set_text(text);
-            docs_[uri].set_version(version);
-        }
-        return;
+        docs_[uri].update(version, text);
     }
 }
 
