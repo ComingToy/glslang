@@ -34,7 +34,7 @@ public:
             return;
         resource_->version = version;
         set_text(text);
-        tokenize_();
+        // tokenize_();
     }
 
     int version() const { return resource_->version; }
@@ -56,15 +56,17 @@ public:
     const char* info_log() { return resource_->shader->getInfoLog(); }
 
     struct LookupResult {
-        enum class Kind { SYMBOL, FIELD, ERROR } kind;
+        enum class Kind { SYMBOL, FIELD, TYPE, ERROR } kind;
         union {
             glslang::TIntermSymbol* sym;
             glslang::TTypeLoc field;
+            const glslang::TType* ty;
         };
     };
 
     std::vector<LookupResult> lookup_nodes_at(const int line, const int col);
     glslang::TSourceLoc locate_symbol_def(Doc::FunctionDefDesc* func, glslang::TIntermSymbol* use);
+    glslang::TSourceLoc locate_userdef_type(const glslang::TType* use);
     static const TBuiltInResource kDefaultTBuiltInResource;
 
 private:

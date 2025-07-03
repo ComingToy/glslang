@@ -525,7 +525,7 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     resource_->func_defs.swap(visitor.funcs);
     resource_->nodes_by_line.swap(visitor.nodes_by_line);
     resource_->userdef_types.swap(visitor.userdef_types);
-    tokenize_();
+    // tokenize_();
 
     return true;
 }
@@ -611,6 +611,23 @@ std::vector<Doc::LookupResult> Doc::lookup_nodes_at(const int line, const int co
             if (bin_result.kind != LookupResult::Kind::ERROR) {
                 result.push_back(bin_result);
             }
+        } else if (auto unary = node->getAsUnaryNode()) {
+            if (unary->getOp() != glslang::EOpDeclare) {
+                continue;
+            }
+
+            auto const& ty = unary->getType();
+            if (!ty.isStruct()) {
+                continue;
+            }
+
+            auto loc = unary->getLoc();
+            auto startcol = loc.column;
+            auto endcol = startcol + ty.getTypeName().size();
+
+            if (line == loc.line && startcol <= col && col <= endcol) {
+                result.push_back({.kind = LookupResult::Kind::TYPE, .ty = &ty});
+            }
         }
     }
 
@@ -634,6 +651,15 @@ glslang::TSourceLoc Doc::locate_symbol_def(Doc::FunctionDefDesc* func, glslang::
     }
 
     return {.name = nullptr, .line = 0, .column = 0};
+}
+
+glslang::TSourceLoc Doc::locate_userdef_type(const glslang::TType* ty)
+{
+    for (auto* def : resource_->userdef_types) {
+        if (def->getType().getTypeName() == ty->getTypeName()) {
+            return def->getLoc();
+        }
+    }
 }
 
 std::vector<glslang::TIntermSymbol*> Doc::lookup_symbols_by_prefix(Doc::FunctionDefDesc* func,
