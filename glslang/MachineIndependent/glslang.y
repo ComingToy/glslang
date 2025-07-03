@@ -1160,12 +1160,14 @@ init_declarator_list
         $$ = $1;
     }
     | init_declarator_list COMMA IDENTIFIER {
-        $$ = $1;
-        parseContext.declareVariable($3.loc, *$3.string, $1.type);
+        $$.type = $1.type;
+        TIntermNode* initNode = parseContext.declareVariable($3.loc, *$3.string, $1.type);
+        $$.intermNode = parseContext.intermediate.growAggregate($1.intermNode, initNode, $3.loc);
     }
     | init_declarator_list COMMA IDENTIFIER array_specifier {
-        $$ = $1;
-        parseContext.declareVariable($3.loc, *$3.string, $1.type, $4.arraySizes);
+        $$.type = $1.type;
+        TIntermNode* initNode = parseContext.declareVariable($3.loc, *$3.string, $1.type, $4.arraySizes);
+        $$.intermNode = parseContext.intermediate.growAggregate($1.intermNode, initNode, $3.loc);
     }
     | init_declarator_list COMMA IDENTIFIER array_specifier EQUAL initializer {
         $$.type = $1.type;
