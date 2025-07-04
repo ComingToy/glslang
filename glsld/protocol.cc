@@ -1,7 +1,9 @@
 #include "protocol.hpp"
 #include "completion.hpp"
+#include <algorithm>
 #include <cstdio>
 #include <iostream>
+#include <iterator>
 #include <regex>
 #include <sstream>
 #include <vector>
@@ -175,30 +177,48 @@ void Protocol::completion_(nlohmann::json& req)
     auto get_words = [this, &uri, line, col](int tok) { return workspace_.get_sentence(uri, line, col, tok); };
     std::vector<std::string> sentence = {get_words(';'), get_words('\n'), get_words('('),
                                          get_words('['), get_words('{'),  get_words(' ')};
-    std::vector<CompletionResult> complete_results;
+    CompletionResultSet complete_results;
     for (auto& word : sentence) {
-        auto complete_results0 = completion(*doc, word, line, col);
-        auto complete_results1 = completion(*doc, "anon@0." + word, line, col);
-        complete_results.insert(complete_results.end(), complete_results0.begin(), complete_results0.end());
-        complete_results.insert(complete_results.end(), complete_results1.begin(), complete_results1.end());
+        completion(*doc, word, line, col, complete_results);
+        completion(*doc, "anon@0." + word, line, col, complete_results);
     }
 
-    std::set<std::string> item_set;
-    std::vector<CompletionResult> final_results;
-    for (auto& item : complete_results) {
-        if (item_set.count(item.insert_text) <= 0) {
-            item_set.insert(item.insert_text);
-            final_results.push_back(item);
+    auto unique_candidates = [](auto& results) {
+        std::set<std::string> item_set;
+        std::vector<CompletionResult> final_results;
+        for (auto& item : results) {
+            if (item_set.count(item.insert_text) <= 0) {
+                item_set.insert(item.insert_text);
+                final_results.push_back(item);
+            }
         }
+
+        results.swap(final_results);
+    };
+
+    unique_candidates(complete_results.variables);
+    unique_candidates(complete_results.funcs);
+    unique_candidates(complete_results.types);
+    unique_candidates(complete_results.keywords);
+    unique_candidates(complete_results.builtins);
+
+    std::vector<CompletionResult> results;
+
+    auto append_to_results = [&results](auto const& candidates) {
+        std::copy(candidates.cbegin(), candidates.cend(), std::back_inserter(results));
+    };
+
+    append_to_results(complete_results.variables);
+    append_to_results(complete_results.funcs);
+    append_to_results(complete_results.types);
+    append_to_results(complete_results.keywords);
+    append_to_results(complete_results.builtins);
+
+    if (results.size() >= 200) {
+        results.resize(200);
     }
 
-    complete_results.clear();
-    complete_results.swap(final_results);
-    if (complete_results.size() >= 200) {
-        complete_results.resize(200);
-    }
-
-    for (auto const& result : complete_results) {
+    for (auto const& result : results) {
         nlohmann::json item;
         item["label"] = result.label;
         item["kind"] = int(result.kind);

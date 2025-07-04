@@ -327,16 +327,17 @@ static bool match_prefix(std::string const& s, std::string const& prefix)
     return prefix == s.substr(0, prefix.size());
 }
 
-static void do_complete_keywords_prefix_(std::string const& prefix, std::vector<CompletionResult>& result)
+static void do_complete_keywords_prefix_(std::string const& prefix, CompletionResultSet& result)
 {
     for (auto& keyword : __keywords) {
         if (match_prefix(keyword, prefix)) {
-            result.push_back({keyword, CompletionItemKind::Keyword, "", "", keyword, InsertTextFormat::PlainText});
+            result.keywords.push_back(
+                {keyword, CompletionItemKind::Keyword, "", "", keyword, InsertTextFormat::PlainText});
         }
     }
 }
 
-static void do_complete_type_prefix_(Doc& doc, std::string const& prefix, std::vector<CompletionResult>& results)
+static void do_complete_type_prefix_(Doc& doc, std::string const& prefix, CompletionResultSet& results)
 {
     auto const& userdef_types = doc.userdef_types();
     for (auto* sym : userdef_types) {
@@ -348,11 +349,11 @@ static void do_complete_type_prefix_(Doc& doc, std::string const& prefix, std::v
 
         CompletionResult r = {tyname, CompletionItemKind::Struct, ty.getCompleteString(true, false, false).c_str(), "",
                               tyname, InsertTextFormat::PlainText};
-        results.push_back(r);
+        results.types.push_back(r);
     }
 }
 
-static void do_complete_builtin_prefix_(Doc& doc, std::string const& prefix, std::vector<CompletionResult>& results)
+static void do_complete_builtin_prefix_(Doc& doc, std::string const& prefix, CompletionResultSet& results)
 {
     auto builtins = doc.lookup_builtin_symbols_by_prefix(prefix);
 
@@ -362,7 +363,7 @@ static void do_complete_builtin_prefix_(Doc& doc, std::string const& prefix, std
             std::string detail = var->getType().getCompleteString(true).c_str();
             CompletionResult result = {label, CompletionItemKind::Variable, detail, "",
                                        label, InsertTextFormat::PlainText};
-            results.push_back(result);
+            results.builtins.push_back(result);
         } else if (const auto* func = sym->getAsFunction()) {
             std::string func_name = func->getName().c_str();
             std::string return_type;
@@ -408,13 +409,13 @@ static void do_complete_builtin_prefix_(Doc& doc, std::string const& prefix, std
 
             CompletionResult r = {func_name,   CompletionItemKind::Function, detail, "",
                                   insert_text, InsertTextFormat::Snippet};
-            results.push_back(r);
+            results.builtins.push_back(r);
         }
     }
 }
 
 static void do_complete_var_prefix_(Doc& doc, const int line, const int col, std::string const& prefix,
-                                    std::vector<CompletionResult>& results)
+                                    CompletionResultSet& results)
 {
     auto* func = doc.lookup_func_by_line(line);
     auto symbols = doc.lookup_symbols_by_prefix(func, prefix);
@@ -423,7 +424,7 @@ static void do_complete_var_prefix_(Doc& doc, const int line, const int col, std
         auto label = sym->getName().c_str();
 
         CompletionResult r = {label, CompletionItemKind::Variable, detail.c_str(), "", label};
-        results.emplace_back(r);
+        results.variables.push_back(r);
     }
 
     auto match_prefix = [&prefix](std::string const& field) {
@@ -487,12 +488,12 @@ static void do_complete_var_prefix_(Doc& doc, const int line, const int col, std
         std::string insert_text = label + "(" + args_list_snippet + ")";
 
         CompletionResult r = {label, CompletionItemKind::Function, detail, "", insert_text, InsertTextFormat::Snippet};
-        results.push_back(r);
+        results.funcs.push_back(r);
     }
 }
 
 static void do_complete_struct_field_(const glslang::TType* ttype, std::string const& prefix,
-                                      std::vector<CompletionResult>& results)
+                                      CompletionResultSet& results)
 {
     auto match_prefix = [&prefix](std::string const& field) {
         if (prefix.empty())
@@ -509,13 +510,13 @@ static void do_complete_struct_field_(const glslang::TType* ttype, std::string c
         auto detail = field->getCompleteString(true, false, false);
         auto doc = "";
         if (match_prefix(label)) {
-            results.push_back({label, kind, detail.c_str(), doc, label, InsertTextFormat::PlainText});
+            results.variables.push_back({label, kind, detail.c_str(), doc, label, InsertTextFormat::PlainText});
         }
     }
 }
 
 static void do_complete_exp_(Doc& doc, const int line, const int col, std::stack<InputStackState>& input_stack,
-                             std::vector<CompletionResult>& results)
+                             CompletionResultSet& results)
 {
     if (input_stack.top().kind != 0) {
         return;
@@ -549,7 +550,7 @@ static void do_complete_exp_(Doc& doc, const int line, const int col, std::stack
                 std::string label = sym->getName().c_str();
                 std::string detail = sym->getType().getCompleteString(true, false, false).c_str();
                 CompletionResult r = {label, CompletionItemKind::Variable, detail, "", label};
-                results.emplace_back(r);
+                results.variables.emplace_back(r);
             }
         } else if (top.tok == DOT) {
             if (input_stack.empty())
@@ -574,8 +575,8 @@ static void do_complete_exp_(Doc& doc, const int line, const int col, std::stack
             std::string tyname = ttype->getBasicTypeString().c_str();
             const char* fields[] = {"x", "y", "z", "w"};
             for (auto i = 0; i < ttype->getVectorSize(); ++i) {
-                results.push_back({fields[i], CompletionItemKind::Field, tyname + " " + fields[i], "", fields[i],
-                                   InsertTextFormat::PlainText});
+                results.variables.push_back({fields[i], CompletionItemKind::Field, tyname + " " + fields[i], "",
+                                             fields[i], InsertTextFormat::PlainText});
             }
         } else {
             auto& members = *ttype->getStruct();
@@ -585,17 +586,16 @@ static void do_complete_exp_(Doc& doc, const int line, const int col, std::stack
                 auto kind = CompletionItemKind::Field;
                 auto detail = field->getCompleteString(true, false, false);
                 auto doc = "";
-                results.push_back({label, kind, detail.c_str(), doc, label, InsertTextFormat::PlainText});
+                results.variables.push_back({label, kind, detail.c_str(), doc, label, InsertTextFormat::PlainText});
             }
         }
     }
 }
 
-static std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tuple<YYSTYPE, int>> const& lex_info,
-                                                 const int line, const int col)
+static void do_complete(Doc& doc, std::vector<std::tuple<YYSTYPE, int>> const& lex_info, const int line, const int col,
+                        CompletionResultSet& results)
 {
     //very tiny varaible exp parser
-    std::vector<CompletionResult> results;
     std::stack<InputStackState> input_stack;
 
 #define START 0
@@ -614,7 +614,7 @@ static std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tupl
                 do_complete_exp_(doc, line, col, input_stack, results);
             }
 
-            return results;
+            return;
         }
 
         switch (state) {
@@ -624,13 +624,13 @@ static std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tupl
                 state = EXPECT_DOT_LBRACKET;
             } else {
                 // err
-                return results;
+                return;
             }
             break;
         case EXPECT_DOT_LBRACKET:
             if (tok == DOT) {
                 if (!reduce_struct_(doc, line, col, input_stack)) {
-                    return results;
+                    return;
                 }
 
                 input_stack.push({0, nullptr, &stype, tok});
@@ -638,12 +638,12 @@ static std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tupl
                 break;
             } else if (tok == LEFT_BRACKET) {
                 if (!reduce_arr_(doc, line, col, input_stack)) {
-                    return results;
+                    return;
                 }
                 input_stack.push({0, nullptr, &stype, tok});
                 state = EXPECT_RBRACKET;
             } else {
-                return results;
+                return;
             }
             break;
         case EXPECT_IDENTIFIER: {
@@ -654,18 +654,18 @@ static std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tupl
                 if (input_stack.top().kind == 0 && input_stack.top().tok == DOT) {
                     input_stack.push({0, nullptr, &stype, tok});
                     if (!reduce_field_(doc, input_stack)) {
-                        return results;
+                        return;
                     }
                     state = EXPECT_DOT_LBRACKET;
                 }
             } else {
-                return results;
+                return;
             }
         } break;
         case EXPECT_RBRACKET:
             if (tok == RIGHT_BRACKET) {
                 if (!reduce_subscript_(doc, input_stack)) {
-                    return results;
+                    return;
                 }
                 state = EXPECT_DOT_LBRACKET;
             }
@@ -674,11 +674,9 @@ static std::vector<CompletionResult> do_complete(Doc& doc, std::vector<std::tupl
             break;
         }
     }
-
-    return results;
 }
 
-std::vector<CompletionResult> completion(Doc& doc, std::string const& input, const int line, const int col)
+void completion(Doc& doc, std::string const& input, const int line, const int col, CompletionResultSet& results)
 {
     const char* source = input.data();
     size_t len = input.size();
@@ -700,7 +698,7 @@ std::vector<CompletionResult> completion(Doc& doc, std::string const& input, con
     } else {
         const char* text = doc.text();
         if (!text) {
-            return {};
+            return;
         }
 
         size_t len = strlen(text);
@@ -709,7 +707,7 @@ std::vector<CompletionResult> completion(Doc& doc, std::string const& input, con
     }
 
     if (version <= 0) {
-        return {};
+        return;
     }
 
     auto parser_resource = create_parser(version, profile, stage, spvVersion, entrypoint.c_str());
@@ -728,8 +726,8 @@ std::vector<CompletionResult> completion(Doc& doc, std::string const& input, con
     }
 
     if (input_toks.empty())
-        return {};
+        return;
 
     input_toks.push_back({YYSTYPE{}, -1});
-    return do_complete(doc, input_toks, line, col);
+    do_complete(doc, input_toks, line, col, results);
 }

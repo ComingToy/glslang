@@ -2,6 +2,7 @@
 #define __GLSLD_COMPLETION_H__
 
 #include "doc.hpp"
+#include <vector>
 enum class CompletionItemKind {
     Text = 1,
     Method = 2,
@@ -53,8 +54,16 @@ struct CompletionResult {
     std::string detail;
     std::string documentation;
     std::string insert_text;
-	InsertTextFormat insert_text_format;
+    InsertTextFormat insert_text_format;
 };
 
-extern std::vector<CompletionResult> completion(Doc& doc, std::string const& input, const int line, const int col);
+struct CompletionResultSet {
+    std::vector<CompletionResult> types;
+    std::vector<CompletionResult> funcs;
+    std::vector<CompletionResult> variables;
+    std::vector<CompletionResult> keywords;
+    std::vector<CompletionResult> builtins;
+};
+
+extern void completion(Doc& doc, std::string const& input, const int line, const int col, CompletionResultSet& results);
 #endif
