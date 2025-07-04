@@ -230,6 +230,63 @@ static void do_complete_type_prefix_(Doc& doc, std::string const& prefix, std::v
     }
 }
 
+static void do_complete_builtin_prefix_(Doc& doc, std::string const& prefix, std::vector<CompletionResult>& results)
+{
+    auto builtins = doc.lookup_builtin_symbols_by_prefix(prefix);
+
+    for (auto* sym : builtins) {
+        if (auto* var = sym->getAsVariable()) {
+            auto* label = var->getName().c_str();
+            std::string detail = var->getType().getCompleteString(true).c_str();
+            CompletionResult result = {label, CompletionItemKind::Variable, detail, "",
+                                       label, InsertTextFormat::PlainText};
+            results.push_back(result);
+        } else if (const auto* func = sym->getAsFunction()) {
+            std::string func_name = func->getName().c_str();
+            std::string return_type;
+            if (func->getType().isStruct()) {
+                return_type = func->getType().getTypeName().c_str();
+            } else {
+                return_type = func->getType().getBasicTypeString().c_str();
+            }
+
+            std::string args_list;
+            std::string args_list_snippet;
+
+            for (int i = 0; i < func->getParamCount(); ++i) {
+                const auto& arg = (*func)[i];
+                char buf[128];
+                auto const& arg_type = *arg.type;
+                const char* arg_type_str;
+                if (arg_type.isStruct()) {
+                    arg_type_str = arg_type.getTypeName().c_str();
+                } else {
+                    arg_type_str = arg_type.getBasicTypeString().c_str();
+                }
+
+                snprintf(buf, sizeof(buf), "${%d:%s %s}", i + 1, arg_type_str, arg.name ? arg.name->c_str() : "");
+
+                args_list_snippet += buf;
+                args_list_snippet += ", ";
+                args_list = args_list + arg_type_str + " " + (arg.name ? arg.name->c_str() : "") + ", ";
+            }
+
+            if (args_list_snippet.size() > 2) {
+                args_list_snippet.pop_back();
+                args_list_snippet.pop_back();
+                args_list.pop_back();
+                args_list.pop_back();
+            }
+            std::string detail = return_type + " " + func_name + "(" + args_list + ")";
+            std::string insert_text = func_name + "(" + args_list_snippet + ")";
+
+            CompletionResult r = {func_name,   CompletionItemKind::Function, detail, "",
+                                  insert_text, InsertTextFormat::Snippet};
+            results.push_back(r);
+        }
+    }
+}
+
 static void do_complete_var_prefix_(Doc& doc, const int line, const int col, std::string const& prefix,
                                     std::vector<CompletionResult>& results)
 {
@@ -351,7 +408,8 @@ static void do_complete_exp_(Doc& doc, const int line, const int col, std::stack
                     do_complete_struct_field_(&anon->getType(), prefix, results);
                 }
             }
-			do_complete_type_prefix_(doc, prefix, results);
+            do_complete_type_prefix_(doc, prefix, results);
+            do_complete_builtin_prefix_(doc, prefix, results);
             return;
         }
 

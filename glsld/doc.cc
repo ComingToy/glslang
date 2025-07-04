@@ -546,12 +546,6 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     resource_->userdef_types.swap(visitor.userdef_types);
     builtin_symbol_table.get_all_symbols(resource_->builtins);
 
-    for (auto const* sym : resource_->builtins) {
-        std::cerr << "built in symbol name: " << sym->getName().c_str()
-                  << ", type: " << sym->getType().getCompleteString(true) << std::endl;
-    }
-    // tokenize_();
-
     return true;
 }
 
@@ -685,6 +679,8 @@ glslang::TSourceLoc Doc::locate_userdef_type(const glslang::TType* ty)
             return def->getLoc();
         }
     }
+
+    return {.name = nullptr, .line = 0, .column = 0};
 }
 
 std::vector<glslang::TIntermSymbol*> Doc::lookup_symbols_by_prefix(Doc::FunctionDefDesc* func,
@@ -712,6 +708,25 @@ std::vector<glslang::TIntermSymbol*> Doc::lookup_symbols_by_prefix(Doc::Function
     }
 
     return symbols;
+}
+
+std::vector<glslang::TSymbol*> Doc::lookup_builtin_symbols_by_prefix(std::string const& prefix)
+{
+    auto match_fn = [&prefix](std::string const& name) {
+        if (prefix.empty())
+            return true;
+
+        return prefix == name.substr(0, prefix.size());
+    };
+
+    std::vector<glslang::TSymbol*> results;
+    for (auto* sym : resource_->builtins) {
+        if (match_fn(sym->getName().c_str())) {
+            results.push_back(sym);
+        }
+    }
+
+    return results;
 }
 
 glslang::TIntermSymbol* Doc::lookup_symbol_by_name(Doc::FunctionDefDesc* func, std::string const& name)

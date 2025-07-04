@@ -49,6 +49,7 @@ public:
 
     std::vector<glslang::TIntermSymbol*> lookup_symbols_by_prefix(Doc::FunctionDefDesc* func,
                                                                   std::string const& prefix);
+	std::vector<glslang::TSymbol*> lookup_builtin_symbols_by_prefix(std::string const& prefix);
     FunctionDefDesc* lookup_func_by_line(int line);
     std::vector<FunctionDefDesc>& func_defs() { return resource_->func_defs; }
     std::vector<glslang::TIntermSymbol*>& userdef_types() { return resource_->userdef_types; }
