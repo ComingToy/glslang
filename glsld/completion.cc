@@ -569,11 +569,16 @@ std::vector<CompletionResult> completion(Doc& doc, std::string const& input, con
     size_t len = input.size();
     glslang::TInputScanner userInput(1, &source, &len);
 
-    auto version = doc.intermediate()->getVersion();
-    auto profile = doc.intermediate()->getProfile();
-    auto stage = doc.intermediate()->getStage();
-    auto spvVersion = doc.intermediate()->getSpv();
-    auto entrypoint = doc.intermediate()->getEntryPointName();
+    auto* interm = doc.intermediate();
+    if (!interm) {
+        return {};
+    }
+
+    auto version = interm->getVersion();
+    auto profile = interm->getProfile();
+    auto stage = interm->getStage();
+    auto spvVersion = interm->getSpv();
+    auto entrypoint = interm->getEntryPointName();
 
     auto parser_resource = create_parser(version, profile, stage, spvVersion, entrypoint.c_str());
     parser_resource->ppcontext->setInput(userInput, false);
