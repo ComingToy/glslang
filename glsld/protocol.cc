@@ -134,13 +134,12 @@ void Protocol::did_open_(nlohmann::json& req)
     int version = textDoc["version"];
     std::string source = textDoc["text"];
     Doc doc(uri, version, source);
-    if (doc.parse({workspace_.get_root()})) {
-        workspace_.add_doc(std::move(doc));
-        publish_clear_diagnostics(uri);
-    } else {
+    if (!doc.parse({workspace_.get_root()})) {
         publish_diagnostics(doc.info_log());
-        fprintf(stderr, "open file %s failed.\n", uri.c_str());
+    } else {
+        publish_clear_diagnostics(uri);
     }
+    workspace_.add_doc(std::move(doc));
 }
 
 void Protocol::did_save_(nlohmann::json& req)
@@ -166,8 +165,6 @@ void Protocol::completion_(nlohmann::json& req)
     int col = params["position"]["character"];
     std::string uri = params["textDocument"]["uri"];
 
-    auto sentence = workspace_.get_sentence(uri, line, col);
-
     auto doc = workspace_.get_doc(uri);
     nlohmann::json completion_items;
     if (!doc) {
@@ -175,9 +172,16 @@ void Protocol::completion_(nlohmann::json& req)
         return;
     }
 
-    auto complete_results = completion(*doc, sentence, line, col);
-    auto complete_results1 = completion(*doc, "anon@0." + sentence, line, col);
-    complete_results.insert(complete_results.end(), complete_results1.begin(), complete_results1.end());
+    auto get_words = [this, &uri, line, col](int tok) { return workspace_.get_sentence(uri, line, col, tok); };
+    std::vector<std::string> sentence = {get_words(';'), get_words('\n'), get_words('('),
+                                         get_words('['), get_words('{'),  get_words(' ')};
+    std::vector<CompletionResult> complete_results;
+    for (auto& word : sentence) {
+        auto complete_results0 = completion(*doc, word, line, col);
+        auto complete_results1 = completion(*doc, "anon@0." + word, line, col);
+        complete_results.insert(complete_results.end(), complete_results0.begin(), complete_results0.end());
+        complete_results.insert(complete_results.end(), complete_results1.begin(), complete_results1.end());
+    }
 
     for (auto const& result : complete_results) {
         nlohmann::json item;

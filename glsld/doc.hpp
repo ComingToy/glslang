@@ -39,6 +39,12 @@ public:
 
     int version() const { return resource_->version; }
     std::vector<std::string> const& lines() const { return resource_->lines_; }
+    const char* text()
+    {
+        if (resource_)
+            return resource_->text_.c_str();
+        return nullptr;
+    }
     std::string const& uri() const { return resource_->uri; }
     EShLanguage language() const { return resource_->language; }
     void set_version(const int version) { resource_->version = version; }

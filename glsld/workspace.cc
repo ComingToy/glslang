@@ -62,7 +62,7 @@ glslang::TSourceLoc Workspace::locate_symbol_def(std::string const& uri, const i
     return {.name = nullptr, .line = 0, .column = 0};
 }
 
-std::string Workspace::get_sentence(std::string const& uri, const int line, const int col)
+std::string Workspace::get_sentence(std::string const& uri, const int line, const int col, int breakc)
 {
     if (docs_.count(uri) <= 0)
         return "";
@@ -78,7 +78,7 @@ std::string Workspace::get_sentence(std::string const& uri, const int line, cons
     auto pos = text.rbegin() + (text.size() - col);
     std::vector<char> buf;
     for (; pos != text.rend(); ++pos) {
-        if (*pos == ';')
+        if (*pos == breakc)
             break;
         buf.push_back(*pos);
     }
