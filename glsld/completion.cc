@@ -535,8 +535,8 @@ static void do_complete_exp_(Doc& doc, const int line, const int col, std::stack
                 }
             }
             do_complete_type_prefix_(doc, prefix, results);
-            do_complete_builtin_prefix_(doc, prefix, results);
             do_complete_keywords_prefix_(prefix, results);
+            do_complete_builtin_prefix_(doc, prefix, results);
             return;
         }
 

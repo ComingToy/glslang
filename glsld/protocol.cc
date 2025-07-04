@@ -183,6 +183,10 @@ void Protocol::completion_(nlohmann::json& req)
         complete_results.insert(complete_results.end(), complete_results1.begin(), complete_results1.end());
     }
 
+    if (complete_results.size() >= 200) {
+        complete_results.resize(200);
+    }
+
     for (auto const& result : complete_results) {
         nlohmann::json item;
         item["label"] = result.label;
