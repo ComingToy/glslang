@@ -166,13 +166,19 @@ void Protocol::completion_(nlohmann::json& req)
     int col = params["position"]["character"];
     std::string uri = params["textDocument"]["uri"];
 
-    auto sentence= workspace_.get_sentence(uri, line, col);
+    auto sentence = workspace_.get_sentence(uri, line, col);
 
-    auto complete_results = completion(*workspace_.get_doc(uri), sentence, line, col);
-    auto complete_results1 = completion(*workspace_.get_doc(uri), "anon@0." + sentence, line, col);
+    auto doc = workspace_.get_doc(uri);
+    nlohmann::json completion_items;
+    if (!doc) {
+        make_response_(req, &completion_items);
+        return;
+    }
+
+    auto complete_results = completion(*doc, sentence, line, col);
+    auto complete_results1 = completion(*doc, "anon@0." + sentence, line, col);
     complete_results.insert(complete_results.end(), complete_results1.begin(), complete_results1.end());
 
-    nlohmann::json completion_items;
     for (auto const& result : complete_results) {
         nlohmann::json item;
         item["label"] = result.label;
