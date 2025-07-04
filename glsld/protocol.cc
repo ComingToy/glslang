@@ -183,6 +183,17 @@ void Protocol::completion_(nlohmann::json& req)
         complete_results.insert(complete_results.end(), complete_results1.begin(), complete_results1.end());
     }
 
+    std::set<std::string> item_set;
+    std::vector<CompletionResult> final_results;
+    for (auto& item : complete_results) {
+        if (item_set.count(item.insert_text) <= 0) {
+            item_set.insert(item.insert_text);
+            final_results.push_back(item);
+        }
+    }
+
+    complete_results.clear();
+    complete_results.swap(final_results);
     if (complete_results.size() >= 200) {
         complete_results.resize(200);
     }
