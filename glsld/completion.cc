@@ -166,8 +166,15 @@ static bool reduce_struct_(Doc& doc, const int line, const int col, std::stack<I
     const glslang::TType* type = nullptr;
     auto* func = doc.lookup_func_by_line(line);
     auto* sym = doc.lookup_symbol_by_name(func, top.stype->lex.string->c_str());
+    auto builtin = doc.lookup_builtin_symbols_by_prefix(top.stype->lex.string->c_str(), true);
+
     if (sym) {
         type = &sym->getType();
+    } else if (!builtin.empty()) {
+        auto* sym = builtin.front();
+        if (auto* var = sym->getAsVariable()) {
+            type = &var->getType();
+        }
     } else {
         auto anons = doc.lookup_symbols_by_prefix(nullptr, "anon@");
         for (auto anon : anons) {
@@ -197,7 +204,7 @@ static bool reduce_struct_(Doc& doc, const int line, const int col, std::stack<I
         type = type->getReferentType();
     }
 
-    if (!type->isStruct()) {
+    if (!type->isStruct() && !type->isVector()) {
         return false;
     }
 
@@ -443,14 +450,23 @@ static void do_complete_exp_(Doc& doc, const int line, const int col, std::stack
             return;
         }
 
-        auto& members = *ttype->getStruct();
-        for (int i = 0; i < members.size(); ++i) {
-            auto field = members[i].type;
-            auto label = field->getFieldName().c_str();
-            auto kind = CompletionItemKind::Field;
-            auto detail = field->getCompleteString(true, false, false);
-            auto doc = "";
-            results.push_back({label, kind, detail.c_str(), doc, label, InsertTextFormat::PlainText});
+        if (ttype->isVector()) {
+            std::string tyname = ttype->getBasicTypeString().c_str();
+            const char* fields[] = {"x", "y", "z", "w"};
+            for (auto i = 0; i < ttype->getVectorSize(); ++i) {
+                results.push_back({fields[i], CompletionItemKind::Field, tyname + " " + fields[i], "", fields[i],
+                                   InsertTextFormat::PlainText});
+            }
+        } else {
+            auto& members = *ttype->getStruct();
+            for (int i = 0; i < members.size(); ++i) {
+                auto field = members[i].type;
+                auto label = field->getFieldName().c_str();
+                auto kind = CompletionItemKind::Field;
+                auto detail = field->getCompleteString(true, false, false);
+                auto doc = "";
+                results.push_back({label, kind, detail.c_str(), doc, label, InsertTextFormat::PlainText});
+            }
         }
     }
 }

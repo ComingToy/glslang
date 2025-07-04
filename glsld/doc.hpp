@@ -9,8 +9,6 @@
 #include <tuple>
 #include <vector>
 
-
-
 class Doc {
 public:
     struct FunctionDefDesc {
@@ -49,7 +47,7 @@ public:
 
     std::vector<glslang::TIntermSymbol*> lookup_symbols_by_prefix(Doc::FunctionDefDesc* func,
                                                                   std::string const& prefix);
-	std::vector<glslang::TSymbol*> lookup_builtin_symbols_by_prefix(std::string const& prefix);
+    std::vector<glslang::TSymbol*> lookup_builtin_symbols_by_prefix(std::string const& prefix, bool fullname = false);
     FunctionDefDesc* lookup_func_by_line(int line);
     std::vector<FunctionDefDesc>& func_defs() { return resource_->func_defs; }
     std::vector<glslang::TIntermSymbol*>& userdef_types() { return resource_->userdef_types; }
@@ -90,7 +88,7 @@ private:
         std::vector<glslang::TIntermSymbol*> globals;
         std::vector<glslang::TIntermSymbol*> userdef_types;
         std::map<int, std::vector<Token>> tokens_by_line;
-		std::vector<glslang::TSymbol*> builtins;
+        std::vector<glslang::TSymbol*> builtins;
         int ref = 1;
     };
 

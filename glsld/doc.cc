@@ -710,13 +710,13 @@ std::vector<glslang::TIntermSymbol*> Doc::lookup_symbols_by_prefix(Doc::Function
     return symbols;
 }
 
-std::vector<glslang::TSymbol*> Doc::lookup_builtin_symbols_by_prefix(std::string const& prefix)
+std::vector<glslang::TSymbol*> Doc::lookup_builtin_symbols_by_prefix(std::string const& prefix, bool fullname)
 {
-    auto match_fn = [&prefix](std::string const& name) {
+    auto match_fn = [&prefix, fullname](std::string const& name) {
         if (prefix.empty())
             return true;
 
-        return prefix == name.substr(0, prefix.size());
+        return fullname ? prefix == name : prefix == name.substr(0, prefix.size());
     };
 
     std::vector<glslang::TSymbol*> results;
