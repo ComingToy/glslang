@@ -163,6 +163,8 @@ Doc::Doc(std::string const& uri, const int version, std::string const& text)
 
 void Doc::set_text(std::string const& text)
 {
+    if (!resource_)
+        return;
     std::stringstream ss(text);
     std::string line;
 
@@ -207,6 +209,8 @@ Doc& Doc::operator=(Doc&& rhs)
 void Doc::infer_language_()
 {
     // support compute stage only now
+    if (!resource_)
+        return;
     resource_->language = EShLangCompute;
 }
 
@@ -449,13 +453,15 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     if (!resource_)
         return false;
 
-    resource_->shader = std::make_unique<glslang::TShader>(language());
-    resource_->nodes_by_line.clear();
-    resource_->globals.clear();
-    resource_->func_defs.clear();
-    resource_->userdef_types.clear();
+    auto* resource = new Doc::__Resource;
+    resource->shader = std::make_unique<glslang::TShader>(language());
+    resource->nodes_by_line.clear();
+    resource->globals.clear();
+    resource->func_defs.clear();
+    resource->userdef_types.clear();
+    resource->builtins.clear();
 
-    auto& shader = *resource_->shader;
+    auto& shader = *resource->shader;
     shader.setDebugInfo(true);
 
     std::string preambles;
@@ -517,6 +523,8 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     success = shader.parse(&kDefaultTBuiltInResource, default_version_, default_profile_, force_version_profile_, false,
                            rules, includer);
     if (!success) {
+		resource_->info_log = shader.getInfoLog();
+        delete resource;
         return false;
     }
 
@@ -529,7 +537,7 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
         auto loc = s->getLoc();
         fprintf(stderr, "global symbol %s define at %s:%d:%d\n", s->getName().c_str(), loc.getFilename(), loc.line,
                 loc.column);
-        resource_->globals.push_back(s);
+        resource->globals.push_back(s);
     }
 
     for (auto& t : visitor.userdef_types) {
@@ -540,11 +548,20 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     }
 
     std::cerr << "DocInfoExtractor found " << visitor.funcs.size() << " function def" << std::endl;
-    resource_->globals.swap(visitor.globals);
-    resource_->func_defs.swap(visitor.funcs);
-    resource_->nodes_by_line.swap(visitor.nodes_by_line);
-    resource_->userdef_types.swap(visitor.userdef_types);
-    builtin_symbol_table.get_all_symbols(resource_->builtins);
+    resource->globals.swap(visitor.globals);
+    resource->func_defs.swap(visitor.funcs);
+    resource->nodes_by_line.swap(visitor.nodes_by_line);
+    resource->userdef_types.swap(visitor.userdef_types);
+    builtin_symbol_table.get_all_symbols(resource->builtins);
+
+    resource->uri = resource_->uri;
+    resource->version = resource_->version;
+    resource->text_ = std::move(resource_->text_);
+    resource->lines_ = std::move(resource_->lines_);
+    resource->language = resource_->language;
+
+    release_();
+    resource_ = resource;
 
     return true;
 }
@@ -612,6 +629,8 @@ static Doc::LookupResult lookup_binop(glslang::TIntermBinary* binary, const int 
 
 std::vector<Doc::LookupResult> Doc::lookup_nodes_at(const int line, const int col)
 {
+    if (!resource_)
+        return {};
     std::vector<LookupResult> result;
     if (resource_->nodes_by_line.count(line) <= 0) {
         return result;
@@ -674,6 +693,9 @@ glslang::TSourceLoc Doc::locate_symbol_def(Doc::FunctionDefDesc* func, glslang::
 
 glslang::TSourceLoc Doc::locate_userdef_type(const glslang::TType* ty)
 {
+    if (!resource_)
+        return {};
+
     for (auto* def : resource_->userdef_types) {
         if (def->getType().getTypeName() == ty->getTypeName()) {
             return def->getLoc();
@@ -686,6 +708,8 @@ glslang::TSourceLoc Doc::locate_userdef_type(const glslang::TType* ty)
 std::vector<glslang::TIntermSymbol*> Doc::lookup_symbols_by_prefix(Doc::FunctionDefDesc* func,
                                                                    std::string const& prefix)
 {
+    if (!resource_)
+        return {};
     std::vector<glslang::TIntermSymbol*> symbols;
     auto match_fn = [&prefix, &symbols](auto vars) {
         for (auto& sym : vars) {
@@ -712,6 +736,8 @@ std::vector<glslang::TIntermSymbol*> Doc::lookup_symbols_by_prefix(Doc::Function
 
 std::vector<glslang::TSymbol*> Doc::lookup_builtin_symbols_by_prefix(std::string const& prefix, bool fullname)
 {
+    if (!resource_)
+        return {};
     auto match_fn = [&prefix, fullname](std::string const& name) {
         if (prefix.empty())
             return true;
@@ -756,6 +782,8 @@ glslang::TIntermSymbol* Doc::lookup_symbol_by_name(Doc::FunctionDefDesc* func, s
 
 Doc::FunctionDefDesc* Doc::lookup_func_by_line(int line)
 {
+    if (!resource_)
+        return nullptr;
     for (auto& func : resource_->func_defs) {
         if (func.start.line <= line && func.end.line >= line) {
             return &func;

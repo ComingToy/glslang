@@ -53,8 +53,11 @@ public:
     std::vector<glslang::TIntermSymbol*>& userdef_types() { return resource_->userdef_types; }
 
     glslang::TIntermSymbol* lookup_symbol_by_name(Doc::FunctionDefDesc* func, std::string const& name);
-    glslang::TIntermediate* intermediate() { return resource_->shader->getIntermediate(); }
-    const char* info_log() { return resource_->shader->getInfoLog(); }
+    glslang::TIntermediate* intermediate()
+    {
+        return (resource_ && resource_->shader) ? resource_->shader->getIntermediate() : nullptr;
+    }
+    const char* info_log() { return resource_ ? resource_->info_log.c_str() : ""; }
 
     struct LookupResult {
         enum class Kind { SYMBOL, FIELD, TYPE, ERROR } kind;
@@ -82,13 +85,16 @@ private:
         std::string text_;
         std::vector<std::string> lines_;
         EShLanguage language;
+
         std::unique_ptr<glslang::TShader> shader;
+
         std::map<int, std::vector<TIntermNode*>> nodes_by_line;
         std::vector<FunctionDefDesc> func_defs;
         std::vector<glslang::TIntermSymbol*> globals;
         std::vector<glslang::TIntermSymbol*> userdef_types;
         std::map<int, std::vector<Token>> tokens_by_line;
         std::vector<glslang::TSymbol*> builtins;
+        std::string info_log;
         int ref = 1;
     };
 
