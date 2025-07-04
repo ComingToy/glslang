@@ -512,7 +512,7 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
         includer.pushExternalLocalDirectory(d);
     }
 
-    const EShMessages rules = static_cast<EShMessages>(EShMsgCascadingErrors | EShMsgSpvRules | EShMsgVulkanRules);
+    const EShMessages rules = static_cast<EShMessages>(EShMsgCascadingErrors | EShMsgSpvRules | EShMsgVulkanRules | EShMsgBuiltinSymbolTable);
 
     auto default_version_ = 110;
     auto default_profile_ = ENoProfile;
@@ -527,6 +527,8 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
         delete resource;
         return false;
     }
+
+	std::cerr << shader.getInfoDebugLog() << std::endl;
 
     auto* interm = shader.getIntermediate();
 

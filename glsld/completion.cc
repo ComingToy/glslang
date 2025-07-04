@@ -1,6 +1,7 @@
 #include "completion.hpp"
 #include "parser.hpp"
 #include <cstdio>
+#include <iostream>
 #include <memory>
 #include <stack>
 #include <tuple>
@@ -267,6 +268,8 @@ static void do_complete_builtin_prefix_(Doc& doc, std::string const& prefix, std
                 const char* arg_type_str;
                 if (arg_type.isStruct()) {
                     arg_type_str = arg_type.getTypeName().c_str();
+                } else if (arg_type.isVector()) {
+                    arg_type_str = arg_type.getCompleteString(true, false, false).c_str();
                 } else {
                     arg_type_str = arg_type.getBasicTypeString().c_str();
                 }
@@ -286,6 +289,8 @@ static void do_complete_builtin_prefix_(Doc& doc, std::string const& prefix, std
             }
             std::string detail = return_type + " " + func_name + "(" + args_list + ")";
             std::string insert_text = func_name + "(" + args_list_snippet + ")";
+
+            std::cerr << "complete builtin func: " << insert_text << std::endl;
 
             CompletionResult r = {func_name,   CompletionItemKind::Function, detail, "",
                                   insert_text, InsertTextFormat::Snippet};
