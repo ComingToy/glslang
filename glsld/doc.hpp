@@ -87,6 +87,7 @@ private:
         std::vector<glslang::TIntermSymbol*> globals;
         std::vector<glslang::TIntermSymbol*> userdef_types;
         std::map<int, std::vector<Token>> tokens_by_line;
+		std::unique_ptr<glslang::TSymbolTable> builtin_symbol_table;
         int ref = 1;
     };
 

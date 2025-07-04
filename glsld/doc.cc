@@ -2,6 +2,7 @@
 #include "../glslang/MachineIndependent/localintermediate.h"
 #include "StandAlone/DirStackFileIncluder.h"
 #include "glslang/Include/intermediate.h"
+#include "glslang/MachineIndependent/SymbolTable.h"
 #include "glsld/parser.hpp"
 #include <cstdio>
 #include <iostream>
@@ -436,12 +437,15 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
         return false;
 
     resource_->shader = std::make_unique<glslang::TShader>(language());
+	resource_->builtin_symbol_table = std::make_unique<glslang::TSymbolTable>();
     resource_->nodes_by_line.clear();
     resource_->globals.clear();
     resource_->func_defs.clear();
     resource_->userdef_types.clear();
 
     auto& shader = *resource_->shader;
+	shader.setDebugInfo(true);
+
     std::string preambles;
     // TODO: add macro define
 
@@ -481,6 +485,8 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     shader.setEnvInputVulkanRulesRelaxed();
     shader.setInvertY(false);
     shader.setNanMinMaxClamp(false);
+
+	shader.setBuiltinSymbolTable(resource_->builtin_symbol_table.get());
 
     DirStackFileIncluder includer;
     for (auto& d : include_dirs) {

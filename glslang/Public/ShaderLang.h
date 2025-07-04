@@ -446,6 +446,7 @@ enum TBlockStorageClass
     EbsCount,
 };
 
+class TSymbolTable;
 // Make one TShader per shader that you will link into a program. Then
 //  - provide the shader through setStrings() or setStringsWithLengths()
 //  - optionally call setEnv*(), see below for more detail
@@ -580,6 +581,8 @@ public:
 
     void setCompileOnly() { compileOnly = true; }
     bool getCompileOnly() const { return compileOnly; }
+	void setBuiltinSymbolTable(TSymbolTable* table){ builtin_symbol_table = table;}
+	TSymbolTable* getBuiltinSymbolTable(){ return builtin_symbol_table; }
 
     // Interface to #include handlers.
     //
@@ -732,6 +735,7 @@ protected:
 
     // Indicates this shader is meant to be used without linking
     bool compileOnly = false;
+	TSymbolTable* builtin_symbol_table = nullptr;
 
     friend class TProgram;
 

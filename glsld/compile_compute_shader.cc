@@ -183,12 +183,15 @@ glslang::TIntermediate* parse_ast(glslang::TShader& shader, std::string const& f
     const std::string pound_extension = "#extension GL_GOOGLE_include_directive : enable\n";
     preambles += pound_extension;
 
+    shader.setDebugInfo(true);
+
     // Parsing requires its own Glslang symbol tables.
     auto used_shader_stage = EShLangCompute;
     std::string error_tag = fname;
     const char* shader_strings = input_source_string.data();
     const int shader_lengths = static_cast<int>(input_source_string.size());
     const char* string_names = error_tag.c_str();
+
     shader.setStringsWithLengthsAndNames(&shader_strings, &shader_lengths, &string_names, 1);
     shader.setPreamble(preambles.c_str());
     shader.setEntryPoint("main");
@@ -301,6 +304,13 @@ public:
             }
         }
 
+        if (op == glslang::EOpScope) {
+            auto loc = agg->getLoc();
+            auto endloc = agg->getEndLoc();
+            fprintf(stderr, "meet scope from: %s:%d:%d to %s:%d:%d\n", loc.getFilename(), loc.line, loc.column,
+                    endloc.getFilename(), endloc.line, endloc.column);
+        }
+
         if (op != glslang::EOpFunction)
             return true;
         fprintf(stderr, "meet aggregate function define: %s at loc: %s:%d:%d\n", aggName, agg->getLoc().getFilename(),
@@ -309,10 +319,7 @@ public:
         return true;
     }
 
-    bool visitBinary(glslang::TVisit, glslang::TIntermBinary* node) override 
-	{
-		
-	}
+    bool visitBinary(glslang::TVisit, glslang::TIntermBinary* node) override {}
 };
 
 bool visitAllTypesAndSymbols(glslang::TIntermediate* intermediate)
@@ -359,7 +366,7 @@ int main(const int argc, const char* argv[])
     ast->output(sink, true);
     std::cerr << sink.info.c_str() << std::endl;
     std::cerr << sink.debug.c_str() << std::endl;
-    // visitAllTypesAndSymbols(ast);
+    visitAllTypesAndSymbols(ast);
 
     return 0;
 }
