@@ -12,6 +12,8 @@ void Workspace::update_doc(std::string const& uri, const int version, std::strin
 {
     if (docs_.count(uri) > 0) {
         docs_[uri].update(version, text);
+    } else {
+        add_doc(Doc(uri, version, text));
     }
 }
 
@@ -52,9 +54,9 @@ glslang::TSourceLoc Workspace::locate_symbol_def(std::string const& uri, const i
             return docs_[uri].locate_symbol_def(func, node.sym);
         } else if (node.kind == Doc::LookupResult::Kind::FIELD) {
             return node.field.loc;
-        }else if (node.kind == Doc::LookupResult::Kind::TYPE){
-			return docs_[uri].locate_userdef_type(node.ty);
-		}
+        } else if (node.kind == Doc::LookupResult::Kind::TYPE) {
+            return docs_[uri].locate_userdef_type(node.ty);
+        }
     }
 
     return {.name = nullptr, .line = 0, .column = 0};
