@@ -1020,7 +1020,7 @@ bool ProcessDeferred(
     }
 
     if (builtin_symbol_table) {
-        builtin_symbol_table->copyTable(*symbolTable);
+        builtin_symbol_table->adoptLevels(*symbolTable);
     }
     //
     // Now we can process the full shader under proper symbols and rules.

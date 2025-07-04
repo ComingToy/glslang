@@ -9,6 +9,8 @@
 #include <tuple>
 #include <vector>
 
+
+
 class Doc {
 public:
     struct FunctionDefDesc {
@@ -87,7 +89,7 @@ private:
         std::vector<glslang::TIntermSymbol*> globals;
         std::vector<glslang::TIntermSymbol*> userdef_types;
         std::map<int, std::vector<Token>> tokens_by_line;
-		std::unique_ptr<glslang::TSymbolTable> builtin_symbol_table;
+		std::vector<glslang::TSymbol*> builtins;
         int ref = 1;
     };
 

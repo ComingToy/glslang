@@ -431,20 +431,32 @@ public:
     }
 };
 
+class BuiltinSymbolTable : public glslang::TSymbolTable {
+public:
+    void get_all_symbols(std::vector<glslang::TSymbol*>& symbols)
+    {
+        for (int level = currentLevel(); level >= 0; --level) {
+            glslang::TSymbolTableLevel* table_level = table[level];
+            for (auto pos = table_level->get_level().begin(); pos != table_level->get_level().end(); ++pos) {
+                symbols.push_back(pos->second);
+            }
+        }
+    }
+};
+
 bool Doc::parse(std::vector<std::string> const& include_dirs)
 {
     if (!resource_)
         return false;
 
     resource_->shader = std::make_unique<glslang::TShader>(language());
-	resource_->builtin_symbol_table = std::make_unique<glslang::TSymbolTable>();
     resource_->nodes_by_line.clear();
     resource_->globals.clear();
     resource_->func_defs.clear();
     resource_->userdef_types.clear();
 
     auto& shader = *resource_->shader;
-	shader.setDebugInfo(true);
+    shader.setDebugInfo(true);
 
     std::string preambles;
     // TODO: add macro define
@@ -486,7 +498,8 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     shader.setInvertY(false);
     shader.setNanMinMaxClamp(false);
 
-	shader.setBuiltinSymbolTable(resource_->builtin_symbol_table.get());
+    BuiltinSymbolTable builtin_symbol_table;
+    shader.setBuiltinSymbolTable(&builtin_symbol_table);
 
     DirStackFileIncluder includer;
     for (auto& d : include_dirs) {
@@ -531,6 +544,12 @@ bool Doc::parse(std::vector<std::string> const& include_dirs)
     resource_->func_defs.swap(visitor.funcs);
     resource_->nodes_by_line.swap(visitor.nodes_by_line);
     resource_->userdef_types.swap(visitor.userdef_types);
+    builtin_symbol_table.get_all_symbols(resource_->builtins);
+
+    for (auto const* sym : resource_->builtins) {
+        std::cerr << "built in symbol name: " << sym->getName().c_str()
+                  << ", type: " << sym->getType().getCompleteString(true) << std::endl;
+    }
     // tokenize_();
 
     return true;

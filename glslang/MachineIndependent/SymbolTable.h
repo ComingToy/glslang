@@ -591,11 +591,13 @@ public:
     void setThisLevel() { thisLevel = true; }
     bool isThisLevel() const { return thisLevel; }
 
+    typedef std::map<TString, TSymbol*, std::less<TString>, pool_allocator<std::pair<const TString, TSymbol*> > > tLevel;
+
+	tLevel& get_level(){ return level; }
 protected:
     explicit TSymbolTableLevel(TSymbolTableLevel&);
     TSymbolTableLevel& operator=(TSymbolTableLevel&);
 
-    typedef std::map<TString, TSymbol*, std::less<TString>, pool_allocator<std::pair<const TString, TSymbol*> > > tLevel;
     typedef const tLevel::value_type tLevelPair;
     typedef std::pair<tLevel::iterator, bool> tInsertResult;
 
