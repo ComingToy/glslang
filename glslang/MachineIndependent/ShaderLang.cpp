@@ -1019,9 +1019,6 @@ bool ProcessDeferred(
         DumpBuiltinSymbolTable(compiler->infoSink, *symbolTable);
     }
 
-    if (builtin_symbol_table) {
-        builtin_symbol_table->adoptLevels(*symbolTable);
-    }
     //
     // Now we can process the full shader under proper symbols and rules.
     //
@@ -1069,6 +1066,10 @@ bool ProcessDeferred(
 
     // Push a new symbol allocation scope that will get used for the shader's globals.
     symbolTable->push();
+
+    if (builtin_symbol_table) {
+        builtin_symbol_table->adoptLevels(*symbolTable);
+    }
 
     bool success = processingContext(*parseContext, ppContext, fullInput, versionWillBeError, *symbolTable,
                                      intermediate, optLevel, messages);
