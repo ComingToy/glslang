@@ -158,6 +158,16 @@ public:
     void setCurrentString(int string) { currentScanner->setString(string); }
 
     void getPreamble(std::string&);
+	TVector<const char*> getExtensionList()
+	{
+		TVector<const char*> extensions;
+		for (auto& [k, v]: extensionBehavior)
+		{
+			extensions.push_back(k.c_str());
+		}
+
+		return extensions;
+	}
 #ifdef ENABLE_HLSL
     bool isReadingHLSL()    const { return (messages & EShMsgReadHlsl) == EShMsgReadHlsl; }
     bool hlslEnable16BitTypes() const { return (messages & EShMsgHlslEnable16BitTypes) != 0; }
