@@ -8614,7 +8614,9 @@ TIntermNode* TParseContext::declareVariable(const TSourceLoc& loc, TString& iden
             return nullptr;
         }
         initNode = executeInitializer(loc, initializer, variable);
-		aggNode->getSequence().push_back(initNode);
+		if (initNode){
+			aggNode->getSequence().push_back(initNode);
+		}
     }
 
     // look for errors in layout qualifier use
