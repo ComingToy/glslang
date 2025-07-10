@@ -441,7 +441,6 @@ void TParseContext::handlePragma(const TSourceLoc& loc, const TVector<TString>& 
 TIntermTyped* TParseContext::handleVariable(const TSourceLoc& loc, TSymbol* symbol, const TString* string)
 {
     TIntermTyped* node = nullptr;
-	if (symbol) symbol->setLoc(loc);
 
     // Error check for requiring specific extensions present.
     if (symbol && symbol->getNumExtensions())
@@ -8558,8 +8557,6 @@ TIntermNode* TParseContext::declareVariable(const TSourceLoc& loc, TString& iden
     TSymbol* symbol = redeclareBuiltinVariable(loc, identifier, type.getQualifier(), publicType.shaderQualifiers);
     if (symbol == nullptr){
         reservedErrorCheck(loc, identifier);
-	}else{
-		symbol->setLoc(loc);
 	}
 
     if (symbol == nullptr && spvVersion.vulkan > 0 && spvVersion.vulkanRelaxed) {
@@ -8595,6 +8592,7 @@ TIntermNode* TParseContext::declareVariable(const TSourceLoc& loc, TString& iden
     if (symbol == nullptr)
         return nullptr;
 
+	symbol->setLoc(loc);
     // Deal with initializer
 	TIntermAggregate* aggNode = new TIntermAggregate;
 	aggNode->setOperator(EOpSequence);
