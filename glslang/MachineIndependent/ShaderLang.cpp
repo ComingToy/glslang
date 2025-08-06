@@ -47,6 +47,7 @@
 #include "SymbolTable.h"
 #include <cstring>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -1151,7 +1152,7 @@ private:
 //
 // This is not an officially supported or fully working path.
 struct DoPreprocessing {
-    explicit DoPreprocessing(std::string* string) : outputString(string) {}
+    explicit DoPreprocessing(std::string* string, std::map<std::string, std::map<int, int>>* pp_cond_res = nullptr) : outputString(string), pp_cond_res(pp_cond_res) {}
     bool operator()(TParseContextBase& parseContext, TPpContext& ppContext, TInputScanner& input,
                     bool versionWillBeError, TSymbolTable&, TIntermediate&, EShOptimizationLevel, EShMessages)
     {
@@ -1277,9 +1278,14 @@ struct DoPreprocessing {
             parseContext.infoSink.info.prefix(EPrefixError);
             parseContext.infoSink.info << parseContext.getNumErrors() << " compilation errors.  No code generated.\n\n";
         }
+
+		if (pp_cond_res){
+			pp_cond_res->swap(ppContext.get_cond_res());
+		}
         return success;
     }
     std::string* outputString;
+	std::map<std::string, std::map<int, int>>* pp_cond_res;
 };
 
 // DoFullParse is a valid ProcessingConext template argument for fully
@@ -1329,9 +1335,10 @@ bool PreprocessDeferred(TCompiler* compiler, const char* const shaderStrings[], 
                         EShMessages messages,   // warnings/errors/AST; things to print out
                         TShader::Includer& includer,
                         TIntermediate& intermediate, // returned tree, etc.
-                        std::string* outputString, TEnvironment* environment = nullptr)
+                        std::string* outputString, TEnvironment* environment = nullptr,
+						std::map<std::string, std::map<int, int>>* pp_cond_res = nullptr)
 {
-    DoPreprocessing parser(outputString);
+    DoPreprocessing parser(outputString, pp_cond_res);
     return ProcessDeferred(compiler, shaderStrings, numStrings, inputLengths, stringNames, preamble, optLevel,
                            resources, defaultVersion, defaultProfile, forceDefaultVersionAndProfile, overrideVersion,
                            forwardCompatible, messages, intermediate, parser, false, includer, "", environment);
@@ -1921,7 +1928,7 @@ bool TShader::preprocess(const TBuiltInResource* builtInResources, int defaultVe
     return PreprocessDeferred(compiler, strings, numStrings, lengths, stringNames, preamble, EShOptNone,
                               builtInResources, defaultVersion, defaultProfile, forceDefaultVersionAndProfile,
                               overrideVersion, forwardCompatible, message, includer, *intermediate, output_string,
-                              &environment);
+                              &environment, pp_cond_res);
 }
 
 const char* TShader::getInfoLog() { return infoSink->info.c_str(); }

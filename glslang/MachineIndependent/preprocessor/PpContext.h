@@ -79,6 +79,7 @@ NVIDIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef PPCONTEXT_H
 #define PPCONTEXT_H
 
+#include <map>
 #include <stack>
 #include <unordered_map>
 #include <sstream>
@@ -240,6 +241,11 @@ public:
         inputStack.pop_back();
     }
 
+	
+    std::map<std::string, std::map<int, int>>& get_cond_res() 
+    {
+        return cond_res;
+    }
     //
     // From PpTokens.cpp
     //
@@ -735,6 +741,7 @@ protected:
     // True if we're skipping a section enclosed by #if/#ifdef/#elif/#else which was evaluated to
     // be inactive, e.g. #if 0
     bool inElseSkip;
+    std::map<std::string, std::map<int, int>> cond_res;
 };
 
 } // end namespace glslang

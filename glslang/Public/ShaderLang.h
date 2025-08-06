@@ -42,6 +42,7 @@
 #include "../MachineIndependent/Versions.h"
 
 #include <cstring>
+#include <map>
 #include <vector>
 
 #ifdef _WIN32
@@ -583,6 +584,8 @@ public:
     bool getCompileOnly() const { return compileOnly; }
 	void setBuiltinSymbolTable(TSymbolTable* table){ builtin_symbol_table = table;}
 	TSymbolTable* getBuiltinSymbolTable(){ return builtin_symbol_table; }
+	void setPpCondRes(std::map<std::string, std::map<int, int>>* pp_cond_res) { this->pp_cond_res = pp_cond_res; }
+	std::map<std::string, std::map<int, int>>* get_pp_cond_res() { return pp_cond_res; }
 
     // Interface to #include handlers.
     //
@@ -736,6 +739,7 @@ protected:
     // Indicates this shader is meant to be used without linking
     bool compileOnly = false;
 	TSymbolTable* builtin_symbol_table = nullptr;
+	std::map<std::string, std::map<int, int>>* pp_cond_res = nullptr;
 
     friend class TProgram;
 

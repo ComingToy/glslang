@@ -79,6 +79,7 @@ NVIDIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
+#include <cstdio>
 #endif
 
 #include <sstream>
@@ -580,6 +581,10 @@ int TPpContext::CPPif(TPpToken* ppToken)
     bool err = false;
     token = eval(token, MIN_PRECEDENCE, false, res, err, ppToken);
     token = extraTokenCheck(PpAtomIf, ppToken, token);
+    if (!err && ppToken->loc.name){
+        cond_res[ppToken->loc.getFilename()][ppToken->loc.line] = res;
+	}
+
     if (!res && !err)
         token = CPPelse(1, ppToken);
 
