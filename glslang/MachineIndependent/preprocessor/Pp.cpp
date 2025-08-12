@@ -610,14 +610,20 @@ int TPpContext::CPPifdef(int defined, TPpToken* ppToken)
             parseContext.ppError(ppToken->loc, "must be followed by macro name", "#ifndef", "");
     } else {
         MacroSymbol* macro = lookupMacroDef(atomStrings.getAtom(ppToken->name));
+
         token = scanToken(ppToken);
         if (token != '\n') {
             parseContext.ppError(ppToken->loc, "unexpected tokens following #ifdef directive - expected a newline", "#ifdef", "");
             while (token != '\n' && token != EndOfInput)
                 token = scanToken(ppToken);
         }
-        if (((macro != nullptr && !macro->undef) ? 1 : 0) != defined)
+        if (((macro != nullptr && !macro->undef) ? 1 : 0) != defined){
+            cond_res[ppToken->loc.getFilename()][ppToken->loc.line] = 0;
             token = CPPelse(1, ppToken);
+		}else{
+            cond_res[ppToken->loc.getFilename()][ppToken->loc.line] = 1;
+		}
+
     }
 
     return token;
